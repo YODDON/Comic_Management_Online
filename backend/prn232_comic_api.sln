@@ -87,6 +87,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BannerAPI.Domain", "BannerA
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BannerAPI.Infrastructure", "BannerAPI\BannerAPI.Infrastructure\BannerAPI.Infrastructure.csproj", "{3BD14970-B22E-44A5-A521-609D2A7D1C91}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ComicMonolith.Api", "ComicMonolith.Api\ComicMonolith.Api.csproj", "{5F53F73D-FC48-4C93-909F-4294E5221D64}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -505,6 +507,18 @@ Global
 		{3BD14970-B22E-44A5-A521-609D2A7D1C91}.Release|x64.Build.0 = Release|Any CPU
 		{3BD14970-B22E-44A5-A521-609D2A7D1C91}.Release|x86.ActiveCfg = Release|Any CPU
 		{3BD14970-B22E-44A5-A521-609D2A7D1C91}.Release|x86.Build.0 = Release|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Debug|x64.Build.0 = Debug|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Debug|x86.Build.0 = Debug|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Release|x64.ActiveCfg = Release|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Release|x64.Build.0 = Release|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Release|x86.ActiveCfg = Release|Any CPU
+		{5F53F73D-FC48-4C93-909F-4294E5221D64}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
