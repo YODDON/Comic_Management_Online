@@ -21,6 +21,7 @@ Status: `Todo` / `In progress` / `Done` / `Blocked`. Hours are rough estimates. 
 | --- | --- | --- | --- | --- | --- |
 | T01 | main (manual) | Copy code from the old repo (without `.git`), check `.gitignore`, add the harness files | Low | 1 | Todo |
 | T00 | phase-0-prep | Baseline: build the current code, record existing errors/warnings under "Baseline" | Low | 1 | Done |
+| T38 | phase-0-prep | Align MediatR to 12.2.0 and MassTransit(.RabbitMQ) to 8.3.0 in every project (repo already mixes 14.2.0 / 9.2.0) | Med | 2 | Done |
 | T02 | phase-0-prep | Align 10.x packages to 8.0.x (`Caching.StackExchangeRedis`, `Logging.Abstractions`) | Low | 1 | Todo |
 | T03 | phase-0-prep | Remove OData, `Azure.Containers.Tools.Targets`, `Http.Features 5.0.17` (BannerAPI) | Low | 0.5 | Todo |
 | T04 | phase-1-remove-translation | Delete the 6 translation files in ComicAPI | Low | 0.5 | Todo |
@@ -86,3 +87,5 @@ Total estimate: about 92 hours. Work in the order of the rows above (T01 before 
 | Date | Task | Error hit / lesson learned |
 | --- | --- | --- |
 | 2026-11-16 | T00 | Baseline builds are clean (0 errors). Warnings counted by `dotnet build` appear twice in the raw log (project + solution line), so grep counts must be halved. Build used SDK 10, not 8: re-check when an SDK 8 is available. |
+| 2026-11-16 | T02 | Found locked majors already violated: MediatR 14.2.0 in 6 projects (Banner API+Application, Comic API+Application, User API+Application), MassTransit and MassTransit.RabbitMQ 9.2.0 in ComicAPI.API. MediatR 14 needs Logging.Abstractions >= 10, so T02 (8.0.3) fails with NU1605. T02 edits discarded; new task T38 runs first. |
+| 2026-11-16 | T38 | MediatR 14.2.0 -> 12.2.0 (6 projects), MassTransit and MassTransit.RabbitMQ 9.2.0 -> 8.3.0 (ComicAPI.API). Build: 0 errors, 93 warnings (same as baseline). No LicenseKey or 13+/9-only API used. ComicViewed consumer not run against RabbitMQ. |
