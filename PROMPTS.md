@@ -1,313 +1,357 @@
 # PROMPTS.md
 
-Câu lệnh giao việc cho agent. Mỗi việc một phiên mới. Thay `<...>` bằng giá trị thật.
-Trước khi giao việc của giai đoạn mới, tự tạo nhánh: `git checkout -b <nhánh trong PLAN.md>`.
+Prompts for assigning work to the agent. One task per new session. Replace `<...>` with real values.
+The agent creates branches, commits, pushes and merges itself (see "Git workflow" in AGENTS.md).
 
-## A. Dùng chung
-
-### A1. Khởi động phiên
+## 0. Universal prompt (use this for every task)
 
 ```
-Đọc AGENTS.md và PLAN.md. Hôm nay làm việc <ID>.
-Đọc các file liên quan, rồi nêu kế hoạch tối đa 10 dòng: file sẽ sửa, cách làm, lệnh kiểm chứng.
-Dừng và chờ tôi trả lời "ok". Chưa sửa gì.
+Read AGENTS.md, PLAN.md and PROMPTS.md. Pick the first task in the PLAN.md table whose status is "Todo",
+in table order. If it is marked "manual", do not do it: tell me what I need to do by hand and stop.
+Tell me which task you picked. Prepare the branch as described in "Git workflow" in AGENTS.md.
+Find the task's prompt in section B of PROMPTS.md (or use template A2 if none), read the relevant files
+and propose a plan in at most 10 lines. Stop and wait for my "ok".
+After my ok: do the task, run the verification commands, self-review the diff (A4), commit and push
+following the Git workflow, update PLAN.md in the same commit, and report using the format at the end of AGENTS.md.
+If this was the last task of its phase, open and merge the PR following the Git workflow
+(ask me first if the phase has a High-risk task or touches a sensitive area).
+If the build fails 3 times on the same error, stop and ask me.
 ```
 
-### A2. Mẫu giao một việc (khi PROMPTS.md chưa có prompt riêng)
+To run a specific task instead, replace the first two sentences with: `Today's task is <ID>.`
+
+## A. General
+
+### A1. Start a session
 
 ```
-Việc <ID> — <tên>. Phạm vi: chỉ sửa <file/thư mục>. Không đụng <thứ cấm>.
-Mẫu tham chiếu trong repo: <file có cách làm tương tự, nếu có>.
-Xong khi: <lệnh kiểm chứng và kết quả mong đợi>.
-Sau khi xong: chạy lệnh kiểm chứng trong AGENTS.md, commit "<ID>: <mô tả>",
-cập nhật PLAN.md (trạng thái + một dòng Nhật ký), báo cáo theo mẫu cuối AGENTS.md.
+Read AGENTS.md and PLAN.md. Today's task is <ID>.
+Read the relevant files, then propose a plan in at most 10 lines: files to change, approach, verification commands.
+Stop and wait for me to reply "ok". Do not change anything yet.
 ```
 
-### A3. Khi build lỗi
+### A2. Generic task template (when there is no specific prompt below)
 
 ```
-Build lỗi, nguyên văn:
-<dán toàn bộ lỗi>
-Chỉ xử lý lỗi này. Nêu nguyên nhân, cách sửa nhỏ nhất, rồi sửa. Không sửa ngoài phạm vi việc <ID>.
-Nếu đây là lần thứ 3 sửa cùng lỗi mà chưa được: dừng và đề xuất 2 hướng.
+Task <ID>: <name>. Scope: only change <files/folders>. Do not touch <off-limits>.
+Reference pattern in the repo: <file that does something similar, if any>.
+Done when: <verification command and expected result>.
+When done: run the verification commands in AGENTS.md, commit and push following "Git workflow" in AGENTS.md,
+update PLAN.md (status + one Log line) in the same commit, and report using the format at the end of AGENTS.md.
 ```
 
-### A4. Tự review diff trước khi commit
+### A3. Build failure
 
 ```
-Xem git diff của việc <ID>. Liệt kê (chưa sửa): file ngoài phạm vi, chỗ đổi hành vi so với bản cũ,
-bí mật bị lộ, cảnh báo hoặc test bị tắt/sửa để cho qua, package mới.
+The build failed. Exact output:
+<paste the full error>
+Fix only this error. State the cause and the smallest fix, then apply it. Do not change anything outside task <ID>.
+If this is the 3rd failed attempt at the same error, stop and propose 2 options instead.
 ```
 
-### A5. Review Payment/Wallet (chạy trong phiên riêng, không phải phiên đã viết code)
+### A4. Self-review before commit
 
 ```
-Bạn là người review, không viết code. Đọc git diff của <ID> ở PaymentAPI/WalletAPI/saga.
-Tìm: ví bị trừ hai lần, trừ tiền mà chapter không mở, saga kẹt khi một bước lỗi,
-webhook SePay xử lý trùng hoặc không kiểm chữ ký/số tiền, endpoint cần đăng nhập bị mở.
-Mỗi vấn đề: file, dòng, kịch bản tái hiện. Nói rõ phần nào chưa kiểm chứng được.
+Review the git diff for task <ID>. List (do not fix yet): files outside the scope, behavior changes versus the old code,
+exposed secrets, warnings or tests disabled/edited to pass, new packages.
 ```
 
-### A6. Kết phiên
+### A5. Payment/Wallet review (run in a separate session, not the one that wrote the code)
 
 ```
-Cập nhật PLAN.md: trạng thái <ID>, bảng "gRPC còn lại" nếu đổi, một dòng Nhật ký. Không sửa gì khác.
+You are a reviewer and must not write code. Read the git diff for <ID> in PaymentAPI/WalletAPI/the saga.
+Look for: wallet debited twice, money taken but chapter not unlocked, saga stuck when a step fails,
+SePay webhook processed twice or without checking signature/amount, authenticated endpoints made public.
+For each issue give file, line and a reproduction scenario. State clearly what you could not verify.
 ```
 
-## B. Theo việc
-
-### T00, T01 — bạn làm tay
-
-Xem phần "Chuẩn bị" trong doc. Sau T01, prompt kiểm tra:
+### A6b. Merge a phase manually (if the agent did not)
 
 ```
-Chạy lệnh kiểm chứng trong AGENTS.md cho bản hiện tại. Không sửa code.
-Điền mục "Mốc ban đầu" trong PLAN.md: kết quả build, lỗi và cảnh báo có sẵn (nguyên văn, rút gọn nếu quá dài).
+All tasks of phase <branch> are Done. Verify the build, then open a PR and merge it following
+"Git workflow" in AGENTS.md. Show me the PR link before merging if the phase has a High-risk task.
+```
+
+### A6. End of session
+
+```
+Update PLAN.md: status of <ID>, the "Remaining gRPC calls" table if it changed, one Log line. Change nothing else.
+```
+
+## B. Per task
+
+### T01 (manual)
+
+Done by hand. See the guide's "Preparation" section.
+
+### T00
+
+```
+Read AGENTS.md and PLAN.md. Today's task is T00.
+Run the verification commands from AGENTS.md on the current code. Do not change any code.
+Fill in the "Baseline" section of PLAN.md: build results, pre-existing errors and warnings (shortened if very long).
+Set T01 and T00 to "Done". Commit and push following "Git workflow" in AGENTS.md (branch phase-0-prep),
+e.g. "chore(plan): T00 record baseline".
+```
+
+### Hook test (run once after T00)
+
+```
+This is a hook test, not a real task. Try to add one comment line to any file in UserAPI's Migrations folder.
+Report what happened. If the edit succeeded, revert it with git checkout.
 ```
 
 ### T02
 
 ```
-Việc T02. Liệt kê mọi PackageReference version 10.x trong backend, đề xuất bản 8.0.x tương ứng, chờ tôi ok rồi đổi.
-Không đổi MassTransit, MediatR, AutoMapper. Xong khi dotnet build sạch.
+Task T02. List every PackageReference with a 10.x version in backend and propose the matching 8.0.x version.
+Wait for my ok, then change them. Do not touch MassTransit, MediatR or AutoMapper. Done when dotnet build passes.
 ```
 
 ### T03
 
 ```
-Việc T03. Grep để xác nhận không có code dùng OData (EnableQuery, AddOData, ODataController).
-Rồi xóa PackageReference: Microsoft.AspNetCore.OData (8 project), Microsoft.VisualStudio.Azure.Containers.Tools.Targets,
-Microsoft.AspNetCore.Http.Features (BannerAPI). Xong khi dotnet build sạch.
+Task T03. Grep to confirm no code uses OData (EnableQuery, AddOData, ODataController).
+Then remove these PackageReferences: Microsoft.AspNetCore.OData (8 projects),
+Microsoft.VisualStudio.Azure.Containers.Tools.Targets, Microsoft.AspNetCore.Http.Features (BannerAPI).
+Done when dotnet build passes.
 ```
 
 ### T04
 
 ```
-Việc T04. Trong backend/ComicAPI xóa 6 file: Controllers/TranslationsController.cs,
+Task T04. In the backend/ComicAPI.* projects delete these 6 files: Controllers/TranslationsController.cs,
 Features/Translations/Commands/TranslateTextCommand.cs, DTOs/Translation/TranslateTextRequestDto.cs,
 Interfaces/ITranslationService.cs, Infrastructure/Services/N8nTranslationService.cs,
-Infrastructure/Settings/N8nTranslationSettings.cs (đường dẫn nằm dưới các project ComicAPI.*).
-Grep ITranslationService, N8nTranslation, TranslateText và liệt kê tham chiếu còn sót, chưa sửa Program.cs.
-Build có thể lỗi ở Program.cs, báo rõ.
+Infrastructure/Settings/N8nTranslationSettings.cs.
+Grep for ITranslationService, N8nTranslation, TranslateText and list remaining references. Do not edit Program.cs yet.
+The build may fail in Program.cs; report it clearly.
 ```
 
 ### T05
 
 ```
-Việc T05. Trong ComicAPI.API/Program.cs xóa đăng ký N8nTranslationSettings và AddHttpClient cho ITranslationService.
-Trong appsettings.json xóa mục N8nTranslation. Xong khi dotnet build sạch và grep "N8nTranslation" trong backend không còn kết quả.
+Task T05. In ComicAPI.API/Program.cs remove the N8nTranslationSettings registration and the AddHttpClient for ITranslationService.
+In appsettings.json remove the N8nTranslation section.
+Done when dotnet build passes and grep "N8nTranslation" in backend returns nothing.
 ```
 
 ### T06
 
 ```
-Việc T06. Viết lại frontend/src/hooks/useTranslatedTexts.js: luôn trả văn bản gốc, không gọi API,
-giữ nguyên kết quả { translations, translating: false, translationError: '' }.
-Xóa frontend/src/services/translationService.js. Không sửa các trang dùng hook.
-Xong khi npm run build sạch và không còn import translationService.
+Task T06. Rewrite frontend/src/hooks/useTranslatedTexts.js so it always returns the original text and never calls the API,
+keeping the return shape { translations, translating: false, translationError: '' }.
+Delete frontend/src/services/translationService.js. Do not edit the pages that use the hook.
+Done when npm run build passes and nothing imports translationService.
 ```
 
 ### T07
 
 ```
-Việc T07. Xóa backend/n8n/. Trong backend/docker-compose.yml xóa service n8n, libretranslate,
-volume n8n_data, libretranslate_data và mọi depends_on trỏ tới chúng.
-Trong backend/.env.example xóa dòng N8nTranslation__*. Trong backend/README.md, frontend/README.md, README.md
-xóa nội dung về n8n, LibreTranslate, dịch nội dung.
-Xong khi `docker compose -f backend/docker-compose.yml config` không lỗi và grep -ri "n8n\|libretranslate"
-không còn kết quả ngoài AGENTS.md, PLAN.md, PROMPTS.md.
+Task T07. Delete backend/n8n/. In backend/docker-compose.yml remove the n8n and libretranslate services,
+the n8n_data and libretranslate_data volumes, and any depends_on pointing to them.
+In backend/.env.example remove the N8nTranslation__* lines. In the READMEs remove content about n8n,
+LibreTranslate and content translation.
+Done when `docker compose -f backend/docker-compose.yml config` succeeds and grep -ri "n8n\|libretranslate"
+finds nothing outside AGENTS.md, PLAN.md and PROMPTS.md.
 ```
 
 ### T08
 
 ```
-Việc T08. Tạo backend/ComicMonolith.Api (net8.0, web), thêm vào prn232_comic_api.sln.
-Program.cs chỉ có khung: DotNetEnv load một lần, Swagger, CORS (origin đọc từ FRONTEND_URL),
-JWT dùng AddCustomJwtAuthentication của SharedKernel, endpoint GET /health. Chưa nạp module.
-Không sửa project cũ. Xong khi build sạch và `dotnet run` trả 200 ở /health.
+Task T08. Create backend/ComicMonolith.Api (net8.0, web) and add it to prn232_comic_api.sln.
+Program.cs is a skeleton only: DotNetEnv loaded once, Swagger, CORS (origin from FRONTEND_URL),
+JWT via SharedKernel's AddCustomJwtAuthentication, GET /health. Do not load any module yet.
+Do not modify the old projects. Done when the build passes and dotnet run returns 200 on /health.
 ```
 
-### T09 (một module mỗi phiên: Banner → User → Wallet → Comic → Chapter → Social → Mission → Payment)
+### T09 (one module per session: Banner → User → Wallet → Comic → Chapter → Social → Mission → Payment)
 
 ```
-Việc T09 cho <BannerAPI>. Đọc <BannerAPI.API>/Program.cs.
-Tạo extension Add<Banner>Module(IServiceCollection, IConfiguration) chứa DbContext, repository, service,
-và hàm Use<Banner>Module(WebApplication) gọi Database.Migrate() cho DbContext của module.
-Host gọi hai hàm này và nạp controller bằng AddApplicationPart. Không lặp JWT, CORS, Swagger trong module.
-Lời gọi gRPC sang module khác: để nguyên, ghi vào bảng "gRPC còn lại" trong PLAN.md. Chặn build thì dừng hỏi.
-Xong khi build sạch, host chạy, Swagger hiện endpoint của module.
+Task T09 for <BannerAPI>. Read <BannerAPI.API>/Program.cs.
+Create an extension Add<Banner>Module(IServiceCollection, IConfiguration) containing the DbContext, repositories and services,
+and Use<Banner>Module(WebApplication) that calls Database.Migrate() for the module's DbContext.
+The host calls both and loads the controllers with AddApplicationPart. Do not repeat JWT, CORS or Swagger inside the module.
+gRPC calls to other modules: leave them as they are and record them in "Remaining gRPC calls" in PLAN.md.
+If they block the build, stop and ask. Done when the build passes, the host runs and Swagger shows the module's endpoints.
 ```
 
-Với PaymentAPI và WalletAPI: thêm câu "Đây là vùng nhạy cảm: nêu kế hoạch, chờ ok, không đổi logic nghiệp vụ."
+For PaymentAPI and WalletAPI add: "This is a sensitive area: propose a plan, wait for ok, do not change business logic."
 
 ### T10
 
 ```
-Việc T10. Tìm trùng tên giữa các module (class Program, Profile AutoMapper, DTO, namespace, hằng số, file .proto
-sinh cùng namespace). Liệt kê thành bảng và đề xuất đổi tên. Chờ ok rồi mới sửa. Xong khi build sạch.
+Task T10. Find name clashes between modules (Program classes, AutoMapper Profiles, DTOs, namespaces, constants,
+.proto files generating the same namespace). List them in a table and propose renames. Wait for ok before changing.
 ```
 
 ### T11
 
 ```
-Việc T11. Ở host, đăng ký MediatR bằng RegisterServicesFromAssemblies và AddAutoMapper với assembly của 8 module.
-Xóa đăng ký trùng trong module. Xong khi build sạch và gọi được một endpoint đại diện của mỗi module.
+Task T11. In the host, register MediatR with RegisterServicesFromAssemblies and AddAutoMapper with the assemblies of all 8 modules.
+Remove duplicate registrations inside modules. Done when the build passes and one representative endpoint per module works.
 ```
 
 ### T12
 
 ```
-Việc T12. Gộp cấu hình: DotNetEnv chỉ load ở host, JWT cấu hình một lần, gom 8 connection string, Cloudinary,
-SMTP, Google Client ID, SePay vào một appsettings.json và một backend/.env.example (giá trị giả).
-Không đọc hay sửa .env thật. Xong khi host khởi động đủ cấu hình.
+Task T12. Merge configuration: DotNetEnv loaded only in the host, JWT configured once; gather the 8 connection strings,
+Cloudinary, SMTP, Google Client ID and SePay into one appsettings.json and one backend/.env.example (fake values).
+Never read or edit the real .env. Done when the host starts with complete configuration.
 ```
 
 ### T13
 
 ```
-Việc T13. Đọc ApiGateway/appsettings.json (ReverseProxy) và ApiGateway/Program.cs.
-Viết middleware ở host: đổi /comics, /categories, /chapters, /comments, /favorites, /follows, /reading-history,
-/payments, /uploads, /missions, /notifications thành /api/...; giữ /auth, /wallets, /currency, /withdraws, /banners.
-Đối chiếu từng route của gateway, báo route nào khác danh sách trên. Không chuyển /translations.
-Tạo project test (xUnit) và viết unit test cho hàm đổi đường dẫn, gồm query string và đường dẫn con.
-Xong khi dotnet test và build sạch.
+Task T13. Read ApiGateway/appsettings.json (ReverseProxy) and ApiGateway/Program.cs.
+Write a middleware in the host that rewrites /comics, /categories, /chapters, /comments, /favorites, /follows,
+/reading-history, /payments, /uploads, /missions, /notifications to /api/..., and keeps /auth, /wallets, /currency,
+/withdraws, /banners. Check every gateway route and report any that differs from this list. Do not add /translations.
+Create a test project (xUnit) with unit tests for the rewrite, including query strings and sub-paths.
+Done when dotnet test and the build pass.
 ```
 
-### T14
+### T14 (sensitive)
 
 ```
-Việc T14 (vùng nhạy cảm). Đọc ApiGateway/Program.cs, lập bảng mọi endpoint public kèm điều kiện method
-(ví dụ GET /comics trừ /comics/me, /comics/purchased; POST /payments/sepay-webhook). Chưa sửa, chờ tôi duyệt bảng.
-Sau khi duyệt: chuyển luật sang host, giữ thứ tự middleware routing → auth. Viết test: mỗi endpoint public không trả 401,
-endpoint đại diện cần đăng nhập trả 401 khi không có token. Xong khi dotnet test sạch.
+Task T14. Read ApiGateway/Program.cs and build a table of every public endpoint with its method condition
+(e.g. GET /comics except /comics/me and /comics/purchased; POST /payments/sepay-webhook). Do not change anything; wait for me to approve the table.
+After approval: move the rules into the host. Write tests: every public endpoint does not return 401,
+representative protected endpoints return 401 without a token. Done when dotnet test passes.
 ```
 
-### T37 (trước T15)
+### T37 (before T15)
 
 ```
-Việc T37. Không đổi hành vi nào. Viết test đặc tính ghi lại hành vi HIỆN TẠI của: nạp tiền thành công,
-webhook SePay (chữ ký sai, số tiền không khớp, gọi trùng), mua chapter thành công, ví không đủ tiền,
-mua chapter đã sở hữu, chuỗi trạng thái của PurchaseStateMachine.
-Dùng database test phù hợp. Giá trị kỳ vọng lấy từ chạy code hiện tại, không suy đoán.
-Kịch bản nào cần dịch vụ ngoài chưa có thì nêu và hỏi. Xong khi các test PASS trên code hiện tại.
+Task T37. Do not change any behavior. Write characterization tests capturing the CURRENT behavior of: successful deposit,
+SePay webhook (bad signature, amount mismatch, duplicate call), successful chapter purchase, insufficient balance,
+buying an already owned chapter, and the PurchaseStateMachine state sequence.
+Use a suitable test database. Expected values must come from running the current code, not from guessing.
+If a scenario needs an external service that is not available, say so and ask. Done when all tests pass on the current code.
 ```
 
 ### T15
 
 ```
-Việc T15. Chỉ đọc. Từ 16 file .proto và các client/server gRPC, điền bảng "gRPC còn lại" trong PLAN.md:
-module gọi, module bị gọi, hàm rpc, handler dùng. Đánh dấu các cặp gọi vòng. Không sửa code.
+Task T15. Read only. From the 16 .proto files and the gRPC clients/servers, fill in "Remaining gRPC calls" in PLAN.md:
+calling module, called module, RPC method, handler using it. Mark circular pairs. Do not change code.
 ```
 
 ### T16
 
 ```
-Việc T16 cho cặp <Mission → Social>. Tạo interface trong SharedKernel (hoặc project Contracts riêng nếu gây tham chiếu vòng),
-tên và kiểu dữ liệu lấy từ hàm rpc tương ứng. Chưa thay lời gọi. Xong khi build sạch.
+Task T16 for the pair <Mission → Social>. Create an interface in SharedKernel (or a separate Contracts project if
+SharedKernel would create a circular reference), with names and types taken from the matching RPC method.
+Do not replace the calls yet. Done when the build passes.
 ```
 
 ### T17
 
 ```
-Việc T17 cho cặp <Mission → Social>. Cài interface bằng gọi trực tiếp service của module kia, thay lời gọi gRPC trong handler.
-Giữ nguyên hành vi, kể cả xử lý lỗi và giá trị trả về khi không tìm thấy. Cặp có Payment hoặc Wallet: nêu kế hoạch, chờ ok,
-sau khi sửa chạy test T37. Xong khi build và test sạch; nêu cách tôi kiểm tra tay. Cập nhật bảng "gRPC còn lại".
+Task T17 for the pair <Mission → Social>. Implement the interface by calling the other module's service directly,
+and replace the gRPC call in the handlers. Keep behavior identical, including error handling and not-found results.
+For pairs involving Payment or Wallet: propose a plan, wait for ok, and run the T37 tests after changing.
+Done when build and tests pass; tell me how to test it manually. Update "Remaining gRPC calls".
 ```
 
 ### T18
 
 ```
-Việc T18. Khi bảng "gRPC còn lại" đã thay hết: xóa gRPC client/server, 16 file .proto, Protobuf item trong .csproj,
-package Grpc.* và Google.Protobuf, biến *_API_URL và GrpcEndpoints trong cấu hình và .env.example.
-Xong khi build, test sạch và grep -ri "grpc" trong backend không còn kết quả trong code.
+Task T18. Once every row in "Remaining gRPC calls" is replaced: delete gRPC clients/servers, the 16 .proto files,
+Protobuf items in .csproj, the Grpc.* and Google.Protobuf packages, and the *_API_URL and GrpcEndpoints settings
+in configuration and .env.example. Done when build and tests pass and grep -ri "grpc" in backend finds no code.
 ```
 
 ### T19
 
 ```
-Việc T19. Trong ComicAPI thay AddStackExchangeRedisCache bằng AddDistributedMemoryCache, giữ code dùng IDistributedCache.
-Xóa package Microsoft.Extensions.Caching.StackExchangeRedis, biến REDIS_CONNECTION, service redis trong compose. Xong khi build sạch.
+Task T19. In ComicAPI replace AddStackExchangeRedisCache with AddDistributedMemoryCache, keeping the IDistributedCache code.
+Remove the Microsoft.Extensions.Caching.StackExchangeRedis package, REDIS_CONNECTION, and the redis service in compose.
+Done when the build passes.
 ```
 
-### T20
+### T20 (High risk)
 
 ```
-Việc T20 (rủi ro Cao). Liệt kê mọi AddMassTransit, consumer, saga, ReceiveEndpoint trong 6 module.
-Đề xuất cách gộp thành một bus ở host (vẫn RabbitMQ ở bước này). Chờ ok rồi sửa. Chạy test T37 sau khi sửa.
+Task T20. List every AddMassTransit, consumer, saga and ReceiveEndpoint across the 6 modules.
+Propose how to merge them into one bus in the host (still RabbitMQ at this step). Wait for ok, then change.
+Run the T37 tests afterwards.
 ```
 
 ### T21
 
 ```
-Việc T21. Đổi transport sang UsingInMemory, bỏ MassTransit.RabbitMQ, RABBITMQ_*, service rabbitmq trong compose.
-Xong khi build sạch, test T37 PASS và một event đại diện (ComicViewedIntegrationEvent) được consume.
+Task T21. Switch the transport to UsingInMemory; remove MassTransit.RabbitMQ, RABBITMQ_* and the rabbitmq service in compose.
+Done when the build passes, the T37 tests pass, and a representative event (ComicViewedIntegrationEvent) is consumed.
 ```
 
 ### T22
 
 ```
-Việc T22. Chỉ đọc và đề xuất. Tìm mọi AddEntityFrameworkOutbox, UseBusOutbox.
-Với version MassTransit trong .csproj, xác định một bus có dùng outbox cho nhiều DbContext được không,
-chỉ dựa trên tài liệu hoặc mã nguồn thư viện (ghi rõ nguồn). Viết các phương án vào "Quyết định mở". Không sửa code.
+Task T22. Read and propose only. Find every AddEntityFrameworkOutbox and UseBusOutbox.
+For the MassTransit version in the .csproj files, determine whether one bus can use the outbox with several DbContexts,
+based only on official docs or the library's source code (cite the source). Write the options under "Open decisions". Do not change code.
 ```
 
 ### T23
 
 ```
-Việc T23. Áp dụng phương án T22 tôi đã chọn: <phương án>. Giữ PurchaseStateMachine trên bus in-memory.
-Chạy test T37. Đề xuất cách kiểm khi app sập giữa chừng và cách phát hiện, dọn saga kẹt; chờ ok trước khi viết job dọn.
-Sau đó tôi sẽ chạy review A5 ở phiên khác.
+Task T23. Apply the T22 option I chose: <option>. Keep PurchaseStateMachine on the in-memory bus.
+Run the T37 tests. Propose how to test a crash mid-purchase and how to detect and clean up stuck sagas;
+wait for ok before writing the cleanup job.
 ```
 
 ### T24, T25
 
 ```
-Việc T24. Xác nhận 8 DbContext và 8 connection string đúng sau khi gộp, mỗi module migrate khi khởi động.
-Liệt kê thứ tự khởi động và quyền SQL cần có. Không đổi migration.
+Task T24. Confirm the 8 DbContexts and 8 connection strings are correct after the merge and each module migrates at startup.
+List the startup order and the SQL permissions required. Do not change migrations.
 ```
 
 ```
-Việc T25. Bỏ mật khẩu mặc định changeme123 khỏi docker-compose.yml, bắt buộc lấy từ SQL_SA_PASSWORD.
-Cập nhật .env.example bằng giá trị giả. Sửa README cho khớp.
+Task T25. Remove the changeme123 default password from docker-compose.yml and require SQL_SA_PASSWORD.
+Update .env.example with a fake value. Update the README to match.
 ```
 
 ### T26, T28
 
 ```
-Việc T26. Build toàn solution. Với mỗi cảnh báo mới so với "Mốc ban đầu": nêu nguyên nhân, đề xuất sửa nhỏ nhất.
+Task T26. Build the whole solution. For each warning that is new compared with "Baseline" in PLAN.md:
+state the cause and propose the smallest fix.
 ```
 
 ```
-Việc T28. Đặt VITE_API_URL trong frontend/.env.example, chạy npm run build. Grep mọi đường dẫn API trong frontend/src/services,
-đối chiếu với route của host sau middleware. Liệt kê đường dẫn không khớp.
+Task T28. Set VITE_API_URL in frontend/.env.example and run npm run build. Grep every API path in frontend/src/services
+and compare it with the host's routes after the middleware. List any path that does not match.
 ```
 
-### T29 đến T32
+### T29 to T32
 
 ```
-Việc T29. Viết backend/Dockerfile nhiều tầng cho ComicMonolith.Api (sdk:8.0 build, aspnet:8.0 chạy), user không phải root,
-cổng qua ASPNETCORE_URLS. Không copy .env vào image. Thêm .dockerignore.
-```
-
-```
-Việc T30 và T31. Viết docker-compose.prod.yml: backend, sqlserver (volume dữ liệu, không publish 1433), nginx (80, 443).
-Nginx phục vụ frontend đã build và chuyển tiếp các route API về backend cùng domain. Đọc biến từ .env.production.
-Xong khi `docker compose -f docker-compose.prod.yml config` không lỗi.
+Task T29. Write a multi-stage backend/Dockerfile for ComicMonolith.Api (sdk:8.0 to build, aspnet:8.0 to run),
+non-root user, port via ASPNETCORE_URLS. Never copy .env into the image. Add a .dockerignore.
 ```
 
 ```
-Việc T32. Viết .env.production.example (giá trị giả): JWT, SQL, Cloudinary, SMTP, Google Client ID, SePay, FRONTEND_URL.
-Thêm .env.production vào .gitignore.
+Tasks T30 and T31. Write docker-compose.prod.yml: backend, sqlserver (data volume, do not publish 1433), nginx (80, 443).
+Nginx serves the built frontend and proxies the API routes to the backend on the same domain. Read variables from .env.production.
+Done when `docker compose -f docker-compose.prod.yml config` succeeds.
+```
+
+```
+Task T32. Write .env.production.example (fake values): JWT, SQL, Cloudinary, SMTP, Google Client ID, SePay, FRONTEND_URL.
+Add .env.production to .gitignore.
 ```
 
 ### T33, T35
 
 ```
-Việc T33. Viết docs/DEPLOY.md: chuẩn bị VPS (Docker, firewall chỉ 22/80/443, domain, HTTPS Let's Encrypt),
-chạy compose, cập nhật phiên bản, việc cần làm ở Google OAuth, SePay/VietQR, CORS, checklist smoke test. Chỉ viết tài liệu.
+Task T33. Write docs/DEPLOY.md: VPS preparation (Docker, firewall only 22/80/443, domain, HTTPS with Let's Encrypt),
+running compose, updating to a new version, what to change in Google OAuth, SePay/VietQR and CORS, and a smoke-test checklist.
+Documentation only.
 ```
 
 ```
-Việc T35. Viết script backup SQL Server hằng ngày (8 database), giữ 7 bản, không chứa mật khẩu trong script,
-kèm hướng dẫn sao chép ra ngoài VPS và khôi phục thử vào database tạm.
+Task T35. Write a daily SQL Server backup script (8 databases), keep 7 copies, no password inside the script,
+plus instructions to copy backups off the VPS and to test a restore into a temporary database.
 ```
