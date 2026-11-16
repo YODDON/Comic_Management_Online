@@ -30,7 +30,7 @@ cp .env.example .env
 VITE_API_URL=
 ```
 
-Khi dev, các request tới `/auth`, `/comics`, `/categories`, `/translations`,
+Khi dev, các request tới `/auth`, `/comics`, `/categories`,
 `/chapters`, `/comments`, `/favorites`, `/follows`, `/reading-history`,
 `/payments`, `/withdraws`, `/missions`, `/notifications` được Vite proxy
 sang `http://127.0.0.1:5028` (ApiGateway) — cấu hình trong `vite.config.js`.
@@ -58,7 +58,7 @@ xem [`../backend/README.md`](../backend/README.md), mục "Kiểm tra / dọn c�
 
 - `src/services/*.js` — các module gọi API (mỗi file tương ứng một domain:
   `authService`, `catalogService`, `bannerService`, `missionService`,
-  `walletService`, `translationService`, ...), dùng chung biến
+  `walletService`, ...), dùng chung biến
   `VITE_API_URL` làm base URL.
 - `scripts/dev.mjs` — orchestrator cho `npm run dev`/`dev:full`.
 - `vite.config.js` — cấu hình dev server + proxy sang ApiGateway.

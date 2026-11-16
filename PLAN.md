@@ -27,7 +27,7 @@ Status: `Todo` / `In progress` / `Done` / `Blocked`. Hours are rough estimates. 
 | T04 | phase-1-remove-translation | Delete the 6 translation files in ComicAPI | Low | 0.5 | Done |
 | T05 | phase-1-remove-translation | Update ComicAPI `Program.cs` and `appsettings.json` | Low | 0.5 | Done |
 | T06 | phase-1-remove-translation | Frontend: rewrite `useTranslatedTexts`, delete `translationService.js` | Low | 0.5 | Done |
-| T07 | phase-1-remove-translation | Clean up `backend/n8n/`, `docker-compose.yml`, `.env.example`, READMEs | Low | 0.5 | Todo |
+| T07 | phase-1-remove-translation | Clean up `backend/n8n/`, `docker-compose.yml`, `.env.example`, READMEs | Low | 0.5 | Done |
 | T08 | phase-2-host | Create `ComicMonolith.Api` (net8.0), add to `.sln`, `/health` endpoint | Med | 3 | Todo |
 | T09 | phase-2-host | Turn the 8 APIs into `AddXxxModule` (one module per session: Banner, User, Wallet, then the rest) | Med | 8 | Todo |
 | T10 | phase-2-host | Resolve name clashes (`Program` classes, AutoMapper profiles, DTOs, namespaces) | Med | 3 | Todo |
@@ -82,6 +82,8 @@ Total estimate: about 92 hours. Work in the order of the rows above (T01 before 
 - [ ] Merge the 8 databases into one or not.
 - [ ] What replaces MassTransit once v8 security support ends (official date still to be confirmed).
 - [ ] Before deploy: review the NU1903 vulnerable-package warnings and bump patch versions within the locked majors.
+- [ ] `frontend/scripts/dev.mjs` starts UserAPI from a path that does not exist (`backend/UserAPI/UserAPI.csproj`; the real one is `backend/UserAPI/UserAPI.API/UserAPI.API.csproj`). Checked: the same is true for the 7 other APIs (Banner, Comic, Chapter, Mission, Payment, Wallet, Social); only `ApiGateway/ApiGateway.csproj` is correct, so `npm run dev` cannot start the backend. Not fixed yet; the script is obsolete once the monolith host exists (T08).
+- [ ] Leftover `/translations` references not removed by T07: `backend/ApiGateway/appsettings.json` (`translations-route`), `backend/ApiGateway/Program.cs:99` (public rule for `POST /translations`), `frontend/vite.config.js` proxy entry. Planned for T13/T14 (gateway replacement) and the frontend config.
 
 ## Log
 
@@ -95,3 +97,4 @@ Total estimate: about 92 hours. Work in the order of the rows above (T01 before 
 | 2026-11-17 | T04 | Deleted the 6 ComicAPI translation files (empty `Translations/` and `Translation/` folders vanish with them). Build now fails with 4x CS0234 in `ComicAPI.API/Program.cs` lines 59-61 (N8nTranslationSettings, N8nTranslationService, ITranslationService), expected until T05. Left for T05/T07: `Program.cs`, `appsettings.json` line 31, `backend/.env.example` lines 60-62. Frontend build passes. |
 | 2026-11-17 | T05 | Removed the N8nTranslationSettings `Configure` and the `AddHttpClient<ITranslationService, ...>` from ComicAPI `Program.cs`, and the `N8nTranslation` section from `appsettings.json`. The 4x CS0234 from T04 are gone: build 0 errors, 93 warnings (baseline); frontend build passes; grep for ITranslationService/N8nTranslation/TranslateText in `*.cs`/`*.json` is empty. Still left for T07: `backend/.env.example` lines 59-62, compose, `backend/n8n/`, READMEs. |
 | 2026-11-17 | T06 | `useTranslatedTexts` no longer calls the API: it returns `{ translations: {key: original}, translating: false, translationError: '' }` (same shape as the old `vi` branch, so the 19 pages need no change). Deleted `translationService.js`. Frontend build passes (95 modules), backend build 0 errors / 93 warnings (baseline), grep for `translationService` and `/translations` in `frontend/src` is empty. Left as dead code: the `translationError`/`translating` banners in the pages (never render now). Not tested in a browser. |
+| 2026-11-17 | T07 | Deleted `backend/n8n/` (2 files), the `libretranslate` and `n8n` services and their 2 volumes from `backend/docker-compose.yml`, the `N8nTranslation__*` lines from `backend/.env.example`, and n8n/LibreTranslate/translation content from the 3 READMEs (backend section 7 removed entirely). `docker compose config` OK (services: sqlserver, rabbitmq, redis); grep n8n/libretranslate outside AGENTS/PLAN/PROMPTS is empty; backend build 0 errors / 93 warnings (baseline); frontend build passes. Left on purpose: `/translations` in ApiGateway and `vite.config.js` (see Open decisions). Compose `version` key is obsolete (warning only, not touched). |
