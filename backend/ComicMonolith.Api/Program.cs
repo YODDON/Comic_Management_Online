@@ -1,5 +1,6 @@
 using BannerAPI;
 using SharedKernel.Extensions;
+using UserAPI.API;
 
 // Load .env once for the whole monolith (modules must not load it themselves).
 DotNetEnv.Env.TraversePath().Load();
@@ -11,6 +12,7 @@ builder.Services.AddControllers();
 
 // Modules
 builder.Services.AddBannerModule(builder.Configuration);
+builder.Services.AddUserModule(builder.Configuration);
 
 builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 builder.Services.AddAuthorization();
@@ -31,6 +33,7 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 app.UseBannerModule();
+app.UseUserModule();
 
 if (app.Environment.IsDevelopment())
 {
