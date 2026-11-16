@@ -24,7 +24,7 @@ Status: `Todo` / `In progress` / `Done` / `Blocked`. Hours are rough estimates. 
 | T38 | phase-0-prep | Align MediatR to 12.2.0 and MassTransit(.RabbitMQ) to 8.3.0 in every project (repo already mixes 14.2.0 / 9.2.0) | Med | 2 | Done |
 | T02 | phase-0-prep | Align 10.x packages to 8.0.x (`Caching.StackExchangeRedis`, `Logging.Abstractions`) | Low | 1 | Done |
 | T03 | phase-0-prep | Remove OData, `Azure.Containers.Tools.Targets`, `Http.Features 5.0.17` (BannerAPI) | Low | 0.5 | Done |
-| T04 | phase-1-remove-translation | Delete the 6 translation files in ComicAPI | Low | 0.5 | Todo |
+| T04 | phase-1-remove-translation | Delete the 6 translation files in ComicAPI | Low | 0.5 | Done |
 | T05 | phase-1-remove-translation | Update ComicAPI `Program.cs` and `appsettings.json` | Low | 0.5 | Todo |
 | T06 | phase-1-remove-translation | Frontend: rewrite `useTranslatedTexts`, delete `translationService.js` | Low | 0.5 | Todo |
 | T07 | phase-1-remove-translation | Clean up `backend/n8n/`, `docker-compose.yml`, `.env.example`, READMEs | Low | 0.5 | Todo |
@@ -92,3 +92,4 @@ Total estimate: about 92 hours. Work in the order of the rows above (T01 before 
 | 2026-11-16 | T38 | MediatR 14.2.0 -> 12.2.0 (6 projects), MassTransit and MassTransit.RabbitMQ 9.2.0 -> 8.3.0 (ComicAPI.API). Build: 0 errors, 93 warnings (same as baseline). No LicenseKey or 13+/9-only API used. ComicViewed consumer not run against RabbitMQ. |
 | 2026-11-17 | T02 | Logging.Abstractions 10.0.11 -> 8.0.3 (12 projects), Caching.StackExchangeRedis 10.0.11 -> 8.0.34 (ComicAPI.API). Only worked after T38 (MediatR 14 required Logging.Abstractions >= 10). Build: 0 errors, 93 warnings (baseline). |
 | 2026-11-17 | T03 | Removed 16 PackageReferences: OData 8.2.5 (8 API projects), Containers.Tools.Targets 1.22.1 (7), Http.Features 5.0.17 (BannerAPI.Application). No code used OData (grep: csproj hits only). Build: 0 errors, 93 warnings (baseline). |
+| 2026-11-17 | T04 | Deleted the 6 ComicAPI translation files (empty `Translations/` and `Translation/` folders vanish with them). Build now fails with 4x CS0234 in `ComicAPI.API/Program.cs` lines 59-61 (N8nTranslationSettings, N8nTranslationService, ITranslationService), expected until T05. Left for T05/T07: `Program.cs`, `appsettings.json` line 31, `backend/.env.example` lines 60-62. Frontend build passes. |
