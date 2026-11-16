@@ -6,7 +6,7 @@ gộp 2 phần vào cùng một chỗ để xem toàn bộ hệ thống trong m�
 
 ```
 Comic_Management/
-├── backend/     <- .NET microservices (ApiGateway + 8 API), SQL Server/Redis/RabbitMQ/n8n
+├── backend/     <- .NET microservices (ApiGateway + 8 API), SQL Server/Redis/RabbitMQ
 └── frontend/    <- React + Vite SPA
 ```
 
@@ -20,13 +20,12 @@ Comic_Management/
   `MissionAPI`, `PaymentAPI`, `WalletAPI`, `BannerAPI`) — mỗi service có
   database SQL Server riêng (mô hình database-per-service), gọi nhau qua
   gRPC nội bộ khi cần.
-- **Hạ tầng dùng chung**: Redis, RabbitMQ, n8n + LibreTranslate (dịch tên
-  truyện/mô tả/chapter — không đụng tới ảnh).
+- **Hạ tầng dùng chung**: Redis, RabbitMQ.
 
 ## Bắt đầu nhanh
 
 1. Đọc [`backend/README.md`](backend/README.md) — cấu hình `.env`, chạy
-   Docker Compose (SQL Server, Redis, RabbitMQ, LibreTranslate, n8n), chạy
+   Docker Compose (SQL Server, Redis, RabbitMQ), chạy
    từng service, migrate database.
 2. Đọc [`frontend/README.md`](frontend/README.md) — cấu hình, chạy dev
    server. Cách nhanh nhất: từ thư mục `frontend/` chạy `npm run dev` — lệnh
@@ -39,4 +38,4 @@ Comic_Management/
 | Backend | .NET 9, ASP.NET Core, EF Core, gRPC, YARP, AutoMapper |
 | Frontend | React, React Router, Vite |
 | Data/Infra | SQL Server, Redis, RabbitMQ, Docker Compose |
-| Tích hợp | Cloudinary (ảnh), n8n + LibreTranslate (dịch văn bản), SePay/VietQR (thanh toán), Gmail SMTP, Google OAuth |
+| Tích hợp | Cloudinary (ảnh), SePay/VietQR (thanh toán), Gmail SMTP, Google OAuth |
