@@ -1,4 +1,5 @@
 using BannerAPI;
+using ComicAPI.API;
 using SharedKernel.Extensions;
 using UserAPI.API;
 using WalletAPI;
@@ -13,6 +14,7 @@ builder.Services.AddControllers();
 
 // Modules
 builder.Services.AddBannerModule(builder.Configuration);
+builder.Services.AddComicModule(builder.Configuration);
 builder.Services.AddUserModule(builder.Configuration);
 builder.Services.AddWalletModule(builder.Configuration);
 
@@ -35,6 +37,7 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 app.UseBannerModule();
+app.UseComicModule();
 app.UseUserModule();
 app.UseWalletModule();
 
