@@ -1,6 +1,7 @@
 using BannerAPI;
 using SharedKernel.Extensions;
 using UserAPI.API;
+using WalletAPI;
 
 // Load .env once for the whole monolith (modules must not load it themselves).
 DotNetEnv.Env.TraversePath().Load();
@@ -13,6 +14,7 @@ builder.Services.AddControllers();
 // Modules
 builder.Services.AddBannerModule(builder.Configuration);
 builder.Services.AddUserModule(builder.Configuration);
+builder.Services.AddWalletModule(builder.Configuration);
 
 builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 builder.Services.AddAuthorization();
@@ -34,6 +36,7 @@ var app = builder.Build();
 
 app.UseBannerModule();
 app.UseUserModule();
+app.UseWalletModule();
 
 if (app.Environment.IsDevelopment())
 {

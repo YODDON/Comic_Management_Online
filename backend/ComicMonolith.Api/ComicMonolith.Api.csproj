@@ -16,6 +16,7 @@
     <ProjectReference Include="..\SharedKernel\SharedKernel.csproj" />
     <ProjectReference Include="..\BannerAPI\BannerAPI.API\BannerAPI.API.csproj" />
     <ProjectReference Include="..\UserAPI\UserAPI.API\UserAPI.API.csproj" />
+    <ProjectReference Include="..\WalletAPI\WalletAPI.API\WalletAPI.API.csproj" />
   </ItemGroup>
 
 </Project>

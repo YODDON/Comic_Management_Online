@@ -1,8 +1,5 @@
-using Microsoft.EntityFrameworkCore;
+using WalletAPI;
 using WalletAPI.Data;
-using WalletAPI.Interfaces;
-using WalletAPI.Repositories;
-using WalletAPI.Services;
 using SharedKernel.Extensions;
 using MassTransit;
 using WalletAPI.Application.Consumers;
@@ -12,26 +9,17 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddGrpc();
-builder.Services.AddScoped<ICurrencyRepository, CurrencyRepository>();
-builder.Services.AddScoped<IWithdrawRepository, WithdrawRepository>();
-builder.Services.AddScoped<IWalletRepository, WalletRepository>();
 
-// Add MediatR for CQRS
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(WalletAPI.Application.Features.Currency.Queries.GetHistoryQuery).Assembly));
-
-var walletConn = Environment.GetEnvironmentVariable("WALLET_DB_CONNECTION");
-if (string.IsNullOrEmpty(walletConn)) walletConn = builder.Configuration.GetConnectionString("WalletConnection");
-if (string.IsNullOrEmpty(walletConn)) walletConn = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrEmpty(walletConn)) walletConn = "Server=localhost,1433;Database=WalletDB;User Id=sa;Password=Your_password123;TrustServerCertificate=True;";
-
-if (!string.IsNullOrEmpty(walletConn))
+// Standalone API keeps its old localhost fallback; the module itself has no hardcoded default.
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WALLET_DB_CONNECTION"))
+    && string.IsNullOrEmpty(builder.Configuration.GetConnectionString("WalletConnection"))
+    && string.IsNullOrEmpty(builder.Configuration.GetConnectionString("DefaultConnection")))
 {
-    builder.Services.AddDbContext<WalletDbContext>(options => options.UseSqlServer(walletConn));
+    builder.Configuration["ConnectionStrings:WalletConnection"] = "Server=localhost,1433;Database=WalletDB;User Id=sa;Password=Your_password123;TrustServerCertificate=True;";
 }
+
+builder.Services.AddWalletModule(builder.Configuration);
 
 builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 
@@ -78,11 +66,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetService<WalletDbContext>();
-    db?.Database.Migrate();
-}
+app.UseWalletModule();
 
 if (app.Environment.IsDevelopment())
 {
