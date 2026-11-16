@@ -56,9 +56,6 @@ builder.Services.AddSwaggerGen(c =>
 });
 builder.Services.Configure<ComicAPI.Infrastructure.Settings.CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
 builder.Services.AddScoped<ComicAPI.Application.Interfaces.ICloudinaryService, ComicAPI.Infrastructure.Services.CloudinaryService>();
-builder.Services.Configure<ComicAPI.Infrastructure.Settings.N8nTranslationSettings>(
-    builder.Configuration.GetSection(ComicAPI.Infrastructure.Settings.N8nTranslationSettings.SectionName));
-builder.Services.AddHttpClient<ComicAPI.Application.Interfaces.ITranslationService, ComicAPI.Infrastructure.Services.N8nTranslationService>();
 
 builder.Services.AddAutoMapper(typeof(ComicAPI.Application.Mappings.ComicProfile).Assembly);
 

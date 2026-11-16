@@ -25,7 +25,7 @@ Status: `Todo` / `In progress` / `Done` / `Blocked`. Hours are rough estimates. 
 | T02 | phase-0-prep | Align 10.x packages to 8.0.x (`Caching.StackExchangeRedis`, `Logging.Abstractions`) | Low | 1 | Done |
 | T03 | phase-0-prep | Remove OData, `Azure.Containers.Tools.Targets`, `Http.Features 5.0.17` (BannerAPI) | Low | 0.5 | Done |
 | T04 | phase-1-remove-translation | Delete the 6 translation files in ComicAPI | Low | 0.5 | Done |
-| T05 | phase-1-remove-translation | Update ComicAPI `Program.cs` and `appsettings.json` | Low | 0.5 | Todo |
+| T05 | phase-1-remove-translation | Update ComicAPI `Program.cs` and `appsettings.json` | Low | 0.5 | Done |
 | T06 | phase-1-remove-translation | Frontend: rewrite `useTranslatedTexts`, delete `translationService.js` | Low | 0.5 | Todo |
 | T07 | phase-1-remove-translation | Clean up `backend/n8n/`, `docker-compose.yml`, `.env.example`, READMEs | Low | 0.5 | Todo |
 | T08 | phase-2-host | Create `ComicMonolith.Api` (net8.0), add to `.sln`, `/health` endpoint | Med | 3 | Todo |
@@ -93,3 +93,4 @@ Total estimate: about 92 hours. Work in the order of the rows above (T01 before 
 | 2026-11-17 | T02 | Logging.Abstractions 10.0.11 -> 8.0.3 (12 projects), Caching.StackExchangeRedis 10.0.11 -> 8.0.34 (ComicAPI.API). Only worked after T38 (MediatR 14 required Logging.Abstractions >= 10). Build: 0 errors, 93 warnings (baseline). |
 | 2026-11-17 | T03 | Removed 16 PackageReferences: OData 8.2.5 (8 API projects), Containers.Tools.Targets 1.22.1 (7), Http.Features 5.0.17 (BannerAPI.Application). No code used OData (grep: csproj hits only). Build: 0 errors, 93 warnings (baseline). |
 | 2026-11-17 | T04 | Deleted the 6 ComicAPI translation files (empty `Translations/` and `Translation/` folders vanish with them). Build now fails with 4x CS0234 in `ComicAPI.API/Program.cs` lines 59-61 (N8nTranslationSettings, N8nTranslationService, ITranslationService), expected until T05. Left for T05/T07: `Program.cs`, `appsettings.json` line 31, `backend/.env.example` lines 60-62. Frontend build passes. |
+| 2026-11-17 | T05 | Removed the N8nTranslationSettings `Configure` and the `AddHttpClient<ITranslationService, ...>` from ComicAPI `Program.cs`, and the `N8nTranslation` section from `appsettings.json`. The 4x CS0234 from T04 are gone: build 0 errors, 93 warnings (baseline); frontend build passes; grep for ITranslationService/N8nTranslation/TranslateText in `*.cs`/`*.json` is empty. Still left for T07: `backend/.env.example` lines 59-62, compose, `backend/n8n/`, READMEs. |
