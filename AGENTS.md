@@ -1,55 +1,71 @@
 # AGENTS.md
 
-Quy tắc cho agent AI trong repo `Comic_Management_Online`. Đọc file này và `PLAN.md` trước khi sửa.
+Rules for AI agents working in `Comic_Management_Online`. Read this file and `PLAN.md` before changing anything.
 
-## Mục tiêu
+## Goal
 
-Chuyển backend .NET 8 từ 9 project chạy riêng (8 API + ApiGateway) sang **một ứng dụng ASP.NET Core 8 (modular monolith)** tên `ComicMonolith.Api`, mỗi service cũ thành một module. Deploy bằng Docker Compose trên VPS. Frontend React/Vite giữ nguyên, chỉ đặt `VITE_API_URL` khi build.
+Migrate the .NET 8 backend from 9 separately running projects (8 APIs + ApiGateway) into **one ASP.NET Core 8 application (modular monolith)** named `ComicMonolith.Api`, where each old service becomes a module. Deploy with Docker Compose on a VPS. The React/Vite frontend stays as is; only `VITE_API_URL` is set at build time.
 
-Mã được sao chép từ https://github.com/YODDON/Comic_Management (chỉ tham chiếu, không sửa repo đó).
+The code was copied from https://github.com/YODDON/Comic_Management (reference only, never modify that repo).
 
-## Quyết định đã chốt (không tự đổi)
+## Settled decisions (do not change on your own)
 
-- **Bỏ:** ApiGateway/YARP (thay bằng middleware đổi đường dẫn), gRPC và 16 file `.proto` (thay bằng interface gọi trực tiếp), RabbitMQ (MassTransit chạy in-memory), Redis (`AddDistributedMemoryCache()`), OData, `Azure.Containers.Tools.Targets`, `Microsoft.AspNetCore.Http.Features 5.0.17`, n8n + LibreTranslate và tính năng dịch.
-- **Giữ:** MassTransit core + saga `PurchaseStateMachine`, MediatR, AutoMapper 12, EF Core 8 + SQL Server với 8 DbContext / 8 database (mỗi module tự `Database.Migrate()`), JWT, BCrypt, Google.Apis.Auth, MailKit, Cloudinary, DotNetEnv.
-- **Chưa quyết, phải hỏi:** EF Outbox của MassTransit (T22), gộp 8 database thành một.
-- **Khóa version:** không đổi major của MassTransit (8), MediatR (12), AutoMapper (12). Bản mới đã đổi giấy phép. Hook sẽ chặn.
+- **Remove:** ApiGateway/YARP (replace with a path-rewrite middleware), gRPC and the 16 `.proto` files (replace with direct in-process interfaces), RabbitMQ (MassTransit runs in-memory), Redis (`AddDistributedMemoryCache()`), OData, `Azure.Containers.Tools.Targets`, `Microsoft.AspNetCore.Http.Features 5.0.17`, n8n + LibreTranslate and the whole translation feature.
+- **Keep:** MassTransit core + the `PurchaseStateMachine` saga, MediatR, AutoMapper 12, EF Core 8 + SQL Server with 8 DbContexts / 8 databases (each module runs its own `Database.Migrate()`), JWT, BCrypt, Google.Apis.Auth, MailKit, Cloudinary, DotNetEnv.
+- **Undecided, ask first:** MassTransit EF Outbox (T22), merging the 8 databases into one.
+- **Version lock:** do not change the major version of MassTransit (8), MediatR (12), AutoMapper (12). Newer versions changed license. A hook enforces this.
 
-## Lệnh kiểm chứng
+## Verification commands
 
 ```
 cd backend && dotnet build prn232_comic_api.sln
 cd frontend && npm install && npm run build
 ```
 
-Có project test thì chạy thêm `dotnet test`. Chỉ báo "xong" khi các lệnh chạy sạch và dán kết quả. Build sạch không chứng minh logic đúng.
+If a test project exists, also run `dotnet test`. Only report "done" when these pass, and paste the result. A clean build does not prove the logic is correct.
 
-## Quy tắc
+## Rules
 
-1. Mỗi phiên làm **một việc** trong `PLAN.md`. Không gộp, không làm trước việc sau.
-2. Đọc file liên quan trước. Việc rủi ro Cao hoặc nhiều file: nêu kế hoạch (file sẽ sửa, cách làm) và **chờ người dùng "ok"**.
-3. Chỉ sửa trong phạm vi việc. Không refactor, đổi tên, định dạng lại file không liên quan.
-4. Không sửa thư mục `Migrations`.
-5. Giữ nguyên đường dẫn API frontend đang gọi. Gateway cũ đổi `/comics`, `/categories`, `/chapters`, `/comments`, `/favorites`, `/follows`, `/reading-history`, `/payments`, `/uploads`, `/missions`, `/notifications` thành `/api/...`; giữ nguyên `/auth`, `/wallets`, `/currency`, `/withdraws`, `/banners`. Không còn route `/translations`.
-6. Giữ nguyên danh sách endpoint public của gateway cũ (`ApiGateway/Program.cs`).
-7. Không đọc, sửa, commit `.env` hay bí mật. Chỉ sửa `.env.example` với giá trị giả.
-8. Không commit vào `main`. Mỗi giai đoạn một nhánh (`phase-1-bo-dich`...), mỗi việc một commit `T04: <mô tả>`.
-9. Không nâng version package nếu việc không yêu cầu. Package mới phải hỏi trước.
-10. Không xóa, sửa test để cho qua; không tắt cảnh báo hay lỗi.
-11. Sửa thất bại 3 lần cùng một lỗi: dừng, dán nguyên văn lỗi, nêu 1–2 hướng và hỏi.
+1. One session = **one task** from `PLAN.md`. Do not combine tasks or start later tasks early.
+2. Read the relevant files first. For High-risk or multi-file tasks, propose a plan (files to change, approach) and **wait for the user's "ok"**.
+3. Stay inside the task's scope. No refactoring, renaming or reformatting unrelated files.
+4. Never modify `Migrations` folders.
+5. Keep the API paths the frontend calls. The old gateway rewrote `/comics`, `/categories`, `/chapters`, `/comments`, `/favorites`, `/follows`, `/reading-history`, `/payments`, `/uploads`, `/missions`, `/notifications` to `/api/...`, and kept `/auth`, `/wallets`, `/currency`, `/withdraws`, `/banners` unchanged. There is no `/translations` route anymore.
+6. Keep the public (anonymous) endpoint list from the old gateway (`ApiGateway/Program.cs`).
+7. Never read, edit or commit `.env` files or secrets. Only edit `.env.example` with fake values.
+8. Never commit or push to `main` directly. Follow the Git workflow below.
+9. Do not upgrade packages unless the task requires it. Ask before adding any new package.
+10. Never delete or edit tests to make them pass; never suppress warnings or errors.
+11. After 3 failed attempts at the same error: stop, paste the exact error, propose 1–2 options and ask.
 
-## Vùng nhạy cảm (dừng và hỏi)
+## Git workflow (the agent does this itself)
 
-PaymentAPI, WalletAPI, saga `PurchaseStateMachine`, mua chapter, nạp/rút tiền, webhook SePay/VietQR, JWT, đăng nhập, Google OAuth, danh sách endpoint public, mọi thao tác có thể mất dữ liệu. Giải thích sẽ sửa gì, rủi ro, chờ đồng ý. Sau khi sửa, nói rõ cách kiểm tra thủ công. Không sửa logic Payment/Wallet trước khi có test đặc tính (T37).
+1. **Branch:** before starting a task, run `git checkout main && git pull`. If the task's phase branch (column "Branch" in `PLAN.md`) exists, switch to it; otherwise create it from `main`. Never work on `main`.
+2. **Commit:** one commit per task, Conventional Commits format with the task ID:
+   `<type>(<scope>): <ID> <summary>`, e.g. `refactor(comic): T04 remove translation files`.
+   Types: `feat`, `fix`, `refactor`, `test`, `build` (packages, Docker, compose), `chore` (cleanup), `docs`.
+   Scope: module or area in lowercase (`host`, `comic`, `payment`, `frontend`, `deps`, `deploy`, `plan`).
+   Summary in English, imperative, max 72 characters. Include the `PLAN.md` update in the same commit.
+3. **Push:** `git push -u origin <branch>` after each commit.
+4. **Merge at the end of a phase:** when every task of the phase is `Done` and verification passes, open a PR with
+   `gh pr create --base main --title "<phase>: <summary>" --body "<tasks done, verification results, unverified items>"`,
+   then `gh pr merge --merge --delete-branch` (merge commit, so each task commit stays in history).
+   Never use `--admin` or bypass branch protection.
+5. **Ask before merging** if the phase contains any High-risk task or touches a sensitive area. Show the PR link and wait for "merge".
+6. After merging, run `git checkout main && git pull`.
 
-## Gộp module (T09)
+## Sensitive areas (stop and ask)
 
-Lời gọi gRPC giữa các module (Mission↔Social, Chapter↔Mission, Comic↔Chapter, Payment→Wallet/Chapter): **không tự thiết kế lại**. Ghi vào bảng "gRPC còn lại" trong `PLAN.md`; nếu chặn build thì dừng và hỏi.
+PaymentAPI, WalletAPI, the `PurchaseStateMachine` saga, chapter purchase, deposits/withdrawals, the SePay/VietQR webhook, JWT, login, Google OAuth, the public endpoint list, and anything that can lose data. Explain what you will change, the risk, and wait for approval. After changing, say how the user should test manually. Do not change Payment/Wallet logic before characterization tests exist (T37).
 
-## Báo cáo cuối việc
+## Merging modules (T09)
 
-- **Đã đổi:** danh sách file.
-- **Kiểm chứng:** lệnh đã chạy và kết quả.
-- **Chưa chắc / cần người dùng kiểm tra:** điều build không chứng minh được.
+gRPC calls between modules (Mission↔Social, Chapter↔Mission, Comic↔Chapter, Payment→Wallet/Chapter): **do not redesign them yet**. Record them in the "Remaining gRPC calls" table in `PLAN.md`; if they block the build, stop and ask.
 
-Sau đó cập nhật trạng thái trong `PLAN.md` và thêm một dòng Nhật ký.
+## End-of-task report
+
+- **Changed:** list of files.
+- **Verification:** commands run and their results.
+- **Unverified / user should check:** what the build cannot prove.
+
+Then update the task status in `PLAN.md` and add one line to the Log.
