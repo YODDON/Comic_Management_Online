@@ -44,6 +44,7 @@ public sealed class T37Fixture : IAsyncLifetime
     {
         world.Grpc.Unavailable.Clear();
         world.Grpc.AfterUnlockCheck = null;
+        world.Grpc.AfterChapterInfo = null;
         world.FailChapterUnlock = false;
         world.FailWalletDebit = false;
         world.FailChapterSave = false;

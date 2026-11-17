@@ -29,6 +29,12 @@ public sealed class ModuleCallLog
     /// </summary>
     public Func<int, Guid, Task>? AfterUnlockCheck { get; set; }
 
+    /// <summary>
+    /// T45: runs after every <c>GetChapterInfo</c> answer, before the caller continues. In the purchase handler this is
+    /// after the first "already purchased" guard and before the locked check, so a test can hold two requests there.
+    /// </summary>
+    public Func<Task>? AfterChapterInfo { get; set; }
+
     /// <summary>Every call made, in order, by full method name.</summary>
     public List<string> Calls { get; } = new();
 
@@ -53,10 +59,12 @@ public sealed class RecordingChapterGateway : IPaymentChapterGateway
         _log = log;
     }
 
-    public Task<ChapterInfo> GetChapterInfoAsync(Guid chapterId, CancellationToken cancellationToken = default)
+    public async Task<ChapterInfo> GetChapterInfoAsync(Guid chapterId, CancellationToken cancellationToken = default)
     {
         _log.Enter(ModuleCallLog.GetChapterInfo);
-        return _inner.GetChapterInfoAsync(chapterId, cancellationToken);
+        var info = await _inner.GetChapterInfoAsync(chapterId, cancellationToken);
+        if (_log.AfterChapterInfo is { } hook) await hook();
+        return info;
     }
 
     public Task<UnlockChapterResult> UnlockChapterAsync(int userId, Guid chapterId, CancellationToken cancellationToken = default)

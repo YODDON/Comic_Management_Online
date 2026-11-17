@@ -30,6 +30,8 @@ namespace PaymentAPI.Application.Features.Payments.Commands
     public class PurchaseChapterCommandHandler : IRequestHandler<PurchaseChapterCommand, ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>>
     {
         private const string VietQrImageBaseUrl = "https://img.vietqr.io/image";
+        // T45: the lock is held only for the check, the insert and the commit, so 10 s is far above any normal wait.
+        private const int PurchaseLockTimeoutMs = 10000;
         private readonly IPaymentRepository _repository;
         private readonly IPaymentChapterGateway _chapterGateway;
         private readonly IPaymentWalletGateway _walletGateway;
@@ -52,31 +54,7 @@ namespace PaymentAPI.Application.Features.Payments.Commands
             var existingPurchase = await _repository.GetUserPurchaseAsync(request.UserId, request.ChapterId);
             if (existingPurchase != null)
             {
-                // Repair a partial cross-service purchase if PaymentDB committed previously but the
-                // corresponding ChapterDB unlock did not.
-                try
-                {
-                    var existingUnlock = await _chapterGateway.UnlockChapterAsync(request.UserId, request.ChapterId);
-                    if (!existingUnlock.Success)
-                    {
-                        return ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>.ErrorResponse(
-                            "Không thể khôi phục quyền đọc chapter đã mua.", 502);
-                    }
-                }
-                catch (ModuleCallException)
-                {
-                    return ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>.ErrorResponse(
-                        "ChapterAPI đang tạm thời không khả dụng.", 503);
-                }
-
-                return new ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>(
-                    new PaymentAPI.DTOs.ChapterPurchaseResultDto
-                    {
-                        ChapterId = request.ChapterId,
-                        Price = existingPurchase.Price,
-                        AlreadyPurchased = true
-                    },
-                    "Chapter này đã được mở khóa trước đó.");
+                return await AlreadyPurchasedAsync(request, existingPurchase.Price);
             }
 
             ChapterInfo chapterInfo;
@@ -110,6 +88,40 @@ namespace PaymentAPI.Application.Features.Payments.Commands
             }
 
             await _repository.BeginTransactionAsync();
+
+            // T45: one open purchase per user and chapter. The application lock is held until the Pending row below is
+            // committed (or this transaction rolls back), so a second request for the same user and chapter waits here
+            // and then sees that committed row instead of starting a second debit.
+            Transaction? openPurchase;
+            try
+            {
+                if (!await _repository.AcquirePurchaseLockAsync(request.UserId, request.ChapterId, PurchaseLockTimeoutMs))
+                {
+                    await _repository.RollbackTransactionAsync();
+                    return ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>.ErrorResponse(
+                        "Hệ thống đang bận. Vui lòng thử lại.", 503);
+                }
+
+                openPurchase = await _repository.GetOpenPurchaseAsync(request.UserId, request.ChapterId);
+            }
+            catch
+            {
+                await _repository.RollbackTransactionAsync();
+                throw;
+            }
+
+            if (openPurchase != null)
+            {
+                await _repository.RollbackTransactionAsync();
+                if (openPurchase.Status == TransactionStatus.Completed)
+                {
+                    return await AlreadyPurchasedAsync(request, openPurchase.Amount);
+                }
+
+                return ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>.ErrorResponse(
+                    "Chapter này đang được thanh toán. Vui lòng chờ giao dịch trước hoàn tất.", 409);
+            }
+
             var walletDebited = false;
             decimal? remainingBalance = null;
             var transaction = new Transaction
@@ -174,6 +186,37 @@ namespace PaymentAPI.Application.Features.Payments.Commands
                 return ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>.ErrorResponse(
                     "Đã xảy ra lỗi khi thanh toán. Vui lòng thử lại.", 500);
             }
+        }
+
+        // The "already unlocked" answer, moved unchanged from the first guard of Handle (T45 also uses it when the
+        // locked check finds a Completed purchase).
+        private async Task<ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>> AlreadyPurchasedAsync(PurchaseChapterCommand request, decimal price)
+        {
+            // Repair a partial cross-service purchase if PaymentDB committed previously but the
+            // corresponding ChapterDB unlock did not.
+            try
+            {
+                var existingUnlock = await _chapterGateway.UnlockChapterAsync(request.UserId, request.ChapterId);
+                if (!existingUnlock.Success)
+                {
+                    return ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>.ErrorResponse(
+                        "Không thể khôi phục quyền đọc chapter đã mua.", 502);
+                }
+            }
+            catch (ModuleCallException)
+            {
+                return ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>.ErrorResponse(
+                    "ChapterAPI đang tạm thời không khả dụng.", 503);
+            }
+
+            return new ApiResponse<PaymentAPI.DTOs.ChapterPurchaseResultDto>(
+                new PaymentAPI.DTOs.ChapterPurchaseResultDto
+                {
+                    ChapterId = request.ChapterId,
+                    Price = price,
+                    AlreadyPurchased = true
+                },
+                "Chapter này đã được mở khóa trước đó.");
         }
 private string BuildVietQrUrl(decimal amount, string transactionCode)
         {

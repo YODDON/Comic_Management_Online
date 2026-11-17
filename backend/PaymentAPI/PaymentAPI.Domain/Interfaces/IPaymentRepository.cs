@@ -28,6 +28,18 @@ namespace PaymentAPI.Interfaces
         Task RollbackTransactionAsync();
         Task SaveFailedTransactionAsync(Transaction transaction);
 
+        // ---- Duplicate purchase guard (T45) ----
+
+        /// <summary>
+        /// Inside <see cref="BeginTransactionAsync"/>: takes an exclusive SQL Server application lock for this user and
+        /// chapter, released by <see cref="CommitTransactionAsync"/> or <see cref="RollbackTransactionAsync"/>.
+        /// False when it is not granted within <paramref name="timeoutMs"/>.
+        /// </summary>
+        Task<bool> AcquirePurchaseLockAsync(int userId, Guid chapterId, int timeoutMs);
+
+        /// <summary>The Pending or Completed <c>Purchase</c> transaction of the user and chapter (Completed first), or null.</summary>
+        Task<Transaction?> GetOpenPurchaseAsync(int userId, Guid chapterId);
+
         // ---- Purchase recovery job (T23) ----
 
         /// <summary>Ids of Pending <c>Purchase</c> transactions created before <paramref name="createdBefore"/>, oldest first.</summary>

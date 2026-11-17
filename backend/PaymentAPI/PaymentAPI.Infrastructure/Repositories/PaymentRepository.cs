@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using PaymentAPI.Data;
@@ -142,6 +144,40 @@ namespace PaymentAPI.Repositories
             // The transaction is already committed: update it, never insert it again.
             _context.Transactions.Update(transaction);
             await _context.SaveChangesAsync();
+        }
+
+        // ---- Duplicate purchase guard (T45) ----
+
+        public async Task<bool> AcquirePurchaseLockAsync(int userId, Guid chapterId, int timeoutMs)
+        {
+            // LockOwner = Transaction needs an open transaction; without one sp_getapplock fails.
+            if (_transaction == null)
+            {
+                throw new InvalidOperationException("The purchase lock needs an open transaction.");
+            }
+
+            var status = new SqlParameter("@status", SqlDbType.Int) { Direction = ParameterDirection.Output };
+            await _context.Database.ExecuteSqlRawAsync(
+                "EXEC @status = sp_getapplock @Resource = @resource, @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = @timeout",
+                status,
+                new SqlParameter("@resource", $"payment-purchase:{userId}:{chapterId:N}"),
+                new SqlParameter("@timeout", timeoutMs));
+
+            // 0 = granted, 1 = granted after waiting; negative = timeout, cancelled, deadlock victim or error.
+            return (int)status.Value >= 0;
+        }
+
+        public async Task<Transaction?> GetOpenPurchaseAsync(int userId, Guid chapterId)
+        {
+            return await _context.Transactions
+                .Where(t => t.UserId == userId
+                            && t.ChapterId == chapterId
+                            && t.Type == SharedKernel.Enums.TransactionType.Purchase
+                            && (t.Status == SharedKernel.Enums.TransactionStatus.Pending
+                                || t.Status == SharedKernel.Enums.TransactionStatus.Completed))
+                .OrderByDescending(t => t.Status == SharedKernel.Enums.TransactionStatus.Completed)
+                .ThenByDescending(t => t.CreatedAt)
+                .FirstOrDefaultAsync();
         }
 
         // ---- Purchase recovery job (T23) ----
