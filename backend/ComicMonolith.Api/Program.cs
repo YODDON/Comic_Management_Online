@@ -97,11 +97,17 @@ if (app.Environment.IsDevelopment())
 // Replaces the YARP gateway's path transforms (/comics -> /api/comics ...). Must run before UseRouting.
 app.UsePathRewrite();
 
+// The gateway's own JSON 404 for a path that matched no route (controller 404s are left alone).
+app.UseNoRouteJson404();
+
 app.UseRouting();
 app.UseCors("Frontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// The gateway's public endpoint list (T14). Needs the endpoint metadata, so it runs after routing and auth.
+app.UsePublicEndpointGate();
 
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
