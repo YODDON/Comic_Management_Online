@@ -208,7 +208,7 @@ namespace ChapterAPI.Repositories
             };
 
             _context.UserPurchases.Add(purchase);
-            // Removed SaveChangesAsync so it can be called from the service after publishing the event
+            // Not saved here: the caller saves (UnlockChapterConsumer publishes ChapterUnlockedEvent only after its save, T43).
             return true;
         }
 

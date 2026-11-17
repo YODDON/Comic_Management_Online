@@ -200,6 +200,95 @@ public abstract class PurchaseSagaScenarios
         await AssertRequestStoredAsync(world, user);
     }
 
+    // ---- T43: ChapterUnlockedEvent only after the unlock row is saved; exactly one unlock outcome per command ----
+
+    protected async Task Chapter_save_failure_refunds_the_debit()
+    {
+        var world = await WorldAsync();
+        world.FailChapterSave = true;
+        var user = TestWorld.NewUserId();
+        var chapter = await world.SeedChapterAsync(120m);
+        await world.SeedWalletAsync(user, 500m);
+
+        await PurchaseFailsAsync(world, user, chapter, "Lỗi hệ thống khi mở khóa chapter: injected: chapter save failed");
+
+        await AssertUnlockFailedAndRefundedAsync(world, user, "Lỗi hệ thống khi mở khóa chapter: injected: chapter save failed");
+        Assert.False(await world.ChapterUnlockedAsync(user, chapter));
+    }
+
+    protected async Task Missing_chapter_at_unlock_refunds_the_debit()
+    {
+        var world = await WorldAsync();
+        var user = TestWorld.NewUserId();
+        var chapter = await world.SeedChapterAsync(120m);
+        await world.SeedWalletAsync(user, 500m);
+        // The chapter is deleted after the purchase handler checked it and before UnlockChapterConsumer runs.
+        world.BeforeChapterUnlock = () =>
+        {
+            using var scope = world.ChapterScope();
+            var db = scope.ServiceProvider.GetRequiredService<ChapterAPI.Data.ChapterDbContext>();
+            db.Chapters.Remove(db.Chapters.Single(c => c.Id == chapter));
+            db.SaveChanges();
+        };
+
+        await PurchaseFailsAsync(world, user, chapter, "Chapter không tồn tại.");
+
+        await AssertUnlockFailedAndRefundedAsync(world, user, "Chapter không tồn tại.");
+        Assert.False(await world.ChapterUnlockedAsync(user, chapter));
+    }
+
+    protected async Task Unlock_row_clash_refunds_the_loser_and_keeps_the_winners_unlock()
+    {
+        var world = await WorldAsync();
+        var user = TestWorld.NewUserId();
+        var chapter = await world.SeedChapterAsync(120m);
+        await world.SeedWalletAsync(user, 500m);
+        // The winner (another purchase of the same user and chapter) saves its unlock row after this consumer checked
+        // for one and before it saves its own: SaveChangesAsync hits the unique (UserId, ChapterId) index.
+        world.BeforeChapterSave = () =>
+        {
+            using var scope = world.ChapterScope();
+            var db = scope.ServiceProvider.GetRequiredService<ChapterAPI.Data.ChapterDbContext>();
+            db.UserPurchases.Add(new ChapterAPI.Entities.UserPurchase { UserId = user, ChapterId = chapter, PurchasedAt = DateTime.UtcNow });
+            db.SaveChanges();
+        };
+
+        var body = await PurchaseAsync(world, user, chapter, 402);
+        Assert.False(body.Success);
+        Assert.StartsWith("Mở khóa chapter thất bại: Lỗi hệ thống khi mở khóa chapter: ", body.Message);
+
+        await AssertUnlockFailedAndRefundedAsync(world, user, expectedNote: null);
+        using var check = world.ChapterScope();
+        var unlockRows = check.ServiceProvider.GetRequiredService<ChapterAPI.Data.ChapterDbContext>()
+            .UserPurchases.Count(p => p.UserId == user && p.ChapterId == chapter);
+        Assert.Equal(1, unlockRows); // the winner's row only
+    }
+
+    /// <summary>
+    /// The loser of a T43 failure: transaction Failed, debit refunded exactly once, no Payment purchase, saga Failed after
+    /// the refund, and exactly one unlock outcome (ChapterUnlockFailedEvent, never ChapterUnlockedEvent).
+    /// </summary>
+    private static async Task AssertUnlockFailedAndRefundedAsync(TestWorld world, int user, string? expectedNote)
+    {
+        var tx = await FinalTransactionAsync(world, user, TransactionStatus.Failed);
+        if (expectedNote != null) Assert.Equal(expectedNote, tx.Note);
+        else Assert.StartsWith("Lỗi hệ thống khi mở khóa chapter: ", tx.Note);
+        Assert.Equal(500m, await world.BalanceAsync(user)); // debited, then refunded
+        var ledger = await world.LedgerAsync(user);
+        Assert.Equal(3, ledger.Count);
+        Assert.Equal((TransactionType.Purchase, -120m, (Guid?)tx.Id), ledger[1]);
+        Assert.Equal((TransactionType.Refund, 120m, (Guid?)RefundReference(tx.Id)), ledger[2]);
+        Assert.Null(await world.PaymentPurchaseAsync(user, tx.ChapterId!.Value));
+        await AssertSagaAsync(world, user, "Failed",
+            new[] { "(none)->Initial", "Initial->ProcessingPayment", "ProcessingPayment->UnlockingChapter", "UnlockingChapter->RefundingWallet", "RefundingWallet->Failed" },
+            new[] { "SubmitPurchaseCommand", "DebitWalletCommand", "WalletDebitedEvent", "UnlockChapterCommand", "ChapterUnlockFailedEvent", "RefundWalletCommand", "WalletRefundedEvent", "PurchaseFailedEvent", "PurchaseFailedEvent" });
+
+        // Never both unlock outcomes for one UnlockChapterCommand.
+        var messages = world.Messages.Snapshot();
+        Assert.Single(messages, m => m == "ChapterUnlockFailedEvent");
+        Assert.DoesNotContain("ChapterUnlockedEvent", messages);
+    }
+
     // Contract check: the same call as PurchaseChapterCommandHandler (IRequestClient<SubmitPurchaseCommand>
     // .GetResponse<PurchaseCompletedEvent, PurchaseFailedEvent>), with a 5 s timeout instead of 30 s. If the saga
     // answers with any other message type, the request client never matches it and this fails with a timeout.
@@ -284,6 +373,9 @@ public class PurchaseSagaTests_RabbitMq : PurchaseSagaScenarios
     [RabbitMqFact] public Task Insufficient_balance_fails_without_charging_and_answers_402() => Insufficient_balance_fails_without_charging();
     [RabbitMqFact] public Task Wallet_debit_failure_fails_without_charging_and_answers_402() => Wallet_debit_failure_fails_without_charging();
     [RabbitMqFact] public Task Chapter_unlock_failure_refunds_the_debit_and_answers_402() => Chapter_unlock_failure_refunds_the_debit();
+    [RabbitMqFact] public Task Chapter_save_failure_refunds_the_debit_and_never_reports_unlocked() => Chapter_save_failure_refunds_the_debit();
+    [RabbitMqFact] public Task Missing_chapter_at_unlock_refunds_the_debit_and_answers_402() => Missing_chapter_at_unlock_refunds_the_debit();
+    [RabbitMqFact] public Task Unlock_row_clash_refunds_the_loser_and_keeps_one_unlock_row() => Unlock_row_clash_refunds_the_loser_and_keeps_the_winners_unlock();
     [RabbitMqFact] public Task Purchase_without_a_requester_still_completes_the_transaction() => Purchase_without_a_requester_still_completes();
     [RabbitMqFact] public Task Saga_answers_with_the_types_the_handler_awaits() => Saga_response_types_match_the_request_client();
 }
@@ -300,6 +392,9 @@ public class PurchaseSagaTests_InMemory : PurchaseSagaScenarios
     [Fact] public Task Insufficient_balance_fails_without_charging_and_answers_402() => Insufficient_balance_fails_without_charging();
     [Fact] public Task Wallet_debit_failure_fails_without_charging_and_answers_402() => Wallet_debit_failure_fails_without_charging();
     [Fact] public Task Chapter_unlock_failure_refunds_the_debit_and_answers_402() => Chapter_unlock_failure_refunds_the_debit();
+    [Fact] public Task Chapter_save_failure_refunds_the_debit_and_never_reports_unlocked() => Chapter_save_failure_refunds_the_debit();
+    [Fact] public Task Missing_chapter_at_unlock_refunds_the_debit_and_answers_402() => Missing_chapter_at_unlock_refunds_the_debit();
+    [Fact] public Task Unlock_row_clash_refunds_the_loser_and_keeps_one_unlock_row() => Unlock_row_clash_refunds_the_loser_and_keeps_the_winners_unlock();
     [Fact] public Task Purchase_without_a_requester_still_completes_the_transaction() => Purchase_without_a_requester_still_completes();
     [Fact] public Task Saga_answers_with_the_types_the_handler_awaits() => Saga_response_types_match_the_request_client();
 }
@@ -316,6 +411,9 @@ public class PurchaseSagaTests_HostBusRabbitMq : PurchaseSagaScenarios
     [RabbitMqFact] public Task Insufficient_balance_fails_without_charging_and_answers_402() => Insufficient_balance_fails_without_charging();
     [RabbitMqFact] public Task Wallet_debit_failure_fails_without_charging_and_answers_402() => Wallet_debit_failure_fails_without_charging();
     [RabbitMqFact] public Task Chapter_unlock_failure_refunds_the_debit_and_answers_402() => Chapter_unlock_failure_refunds_the_debit();
+    [RabbitMqFact] public Task Chapter_save_failure_refunds_the_debit_and_never_reports_unlocked() => Chapter_save_failure_refunds_the_debit();
+    [RabbitMqFact] public Task Missing_chapter_at_unlock_refunds_the_debit_and_answers_402() => Missing_chapter_at_unlock_refunds_the_debit();
+    [RabbitMqFact] public Task Unlock_row_clash_refunds_the_loser_and_keeps_one_unlock_row() => Unlock_row_clash_refunds_the_loser_and_keeps_the_winners_unlock();
     [RabbitMqFact] public Task Purchase_without_a_requester_still_completes_the_transaction() => Purchase_without_a_requester_still_completes();
     [RabbitMqFact] public Task Saga_answers_with_the_types_the_handler_awaits() => Saga_response_types_match_the_request_client();
 }

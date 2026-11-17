@@ -138,6 +138,17 @@ public sealed class TestWorld : IAsyncDisposable
     /// <summary>When set, DebitAsync on the Wallet repository throws (a "database failed" injection).</summary>
     public volatile bool FailWalletDebit;
 
+    /// <summary>T43: when set, SaveChangesAsync on the Chapter repository throws (the unlock row is never saved).</summary>
+    public volatile bool FailChapterSave;
+
+    /// <summary>
+    /// T43: runs once, synchronously, right before the next UnlockChapterAsync / SaveChangesAsync call on the Chapter
+    /// repository, then clears itself. Lets a test change the database at that exact point (delete the chapter, or
+    /// save a competing unlock row).
+    /// </summary>
+    public Action? BeforeChapterUnlock;
+    public Action? BeforeChapterSave;
+
     private TestWorld(WorldOptions options) => Options = options;
 
     public static async Task<TestWorld> StartAsync(TestDatabases dbs, WorldOptions options)
@@ -278,9 +289,22 @@ public sealed class TestWorld : IAsyncDisposable
         s.AddScoped<IChapterRepository>(sp =>
             FaultInjectingProxy.Wrap<IChapterRepository>(
                 ActivatorUtilities.CreateInstance<ChapterRepository>(sp),
-                (method, _) => FailChapterUnlock && method.Name == nameof(IChapterRepository.UnlockChapterAsync)
-                    ? new InvalidOperationException("injected: chapter database failed")
-                    : null));
+                (method, _) =>
+                {
+                    if (method.Name == nameof(IChapterRepository.UnlockChapterAsync))
+                    {
+                        Interlocked.Exchange(ref BeforeChapterUnlock, null)?.Invoke();
+                        return FailChapterUnlock ? new InvalidOperationException("injected: chapter database failed") : null;
+                    }
+
+                    if (method.Name == nameof(IChapterRepository.SaveChangesAsync))
+                    {
+                        Interlocked.Exchange(ref BeforeChapterSave, null)?.Invoke();
+                        return FailChapterSave ? new InvalidOperationException("injected: chapter save failed") : null;
+                    }
+
+                    return null;
+                }));
         // Not under test: the unlock handler needs these only for mission progress / comic checks.
         s.AddSingleton<IMapper>(new MapperConfiguration(_ => { }).CreateMapper());
         s.AddSingleton(NoOpProxy.Create<IComicValidator>());

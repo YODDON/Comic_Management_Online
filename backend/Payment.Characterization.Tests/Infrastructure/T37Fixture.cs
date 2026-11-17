@@ -46,6 +46,9 @@ public sealed class T37Fixture : IAsyncLifetime
         world.Grpc.AfterUnlockCheck = null;
         world.FailChapterUnlock = false;
         world.FailWalletDebit = false;
+        world.FailChapterSave = false;
+        world.BeforeChapterUnlock = null;
+        world.BeforeChapterSave = null;
         world.Messages.Clear();
         world.States.Clear();
         return world;
