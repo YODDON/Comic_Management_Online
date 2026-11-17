@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using MassTransit;
 using PaymentAPI.Domain.Entities;
 using SharedKernel.Contracts.Purchase;
@@ -41,6 +42,9 @@ namespace PaymentAPI.Application.Sagas
                         context.Saga.Price = context.Message.Price;
                         context.Saga.TransactionId = context.Message.TransactionId;
                         context.Saga.CreatedAt = DateTime.UtcNow;
+                        // Keep the original request so a later event can answer it (see FinishAsync).
+                        context.Saga.RequestId = context.RequestId;
+                        context.Saga.ResponseAddress = context.ResponseAddress;
                     })
                     .SendAsync(new Uri("queue:debit-wallet"), context => context.Init<DebitWalletCommand>(new
                     {
@@ -69,25 +73,21 @@ namespace PaymentAPI.Application.Sagas
                         context.Saga.UpdatedAt = DateTime.UtcNow;
                         context.Saga.ErrorReason = context.Message.Reason;
                     })
-                    .RespondAsync(context => context.Init<PurchaseFailedEvent>(new 
-                    {
+                    .ThenAsync(context => FinishAsync(context, new PurchaseFailedEvent(
                         context.Saga.CorrelationId,
-                        Reason = context.Message.Reason,
-                        context.Saga.TransactionId
-                    }))
+                        context.Message.Reason,
+                        context.Saga.TransactionId)))
                     .TransitionTo(Failed)
             );
 
             During(UnlockingChapter,
                 When(ChapterUnlockedEvent)
                     .Then(context => context.Saga.UpdatedAt = DateTime.UtcNow)
-                    .RespondAsync(context => context.Init<PurchaseCompletedEvent>(new 
-                    {
+                    .ThenAsync(context => FinishAsync(context, new PurchaseCompletedEvent(
                         context.Saga.CorrelationId,
-                        RemainingBalance = -1m,
+                        -1m,
                         context.Saga.TransactionId,
-                        context.Saga.ComicId
-                    }))
+                        context.Saga.ComicId)))
                     .Finalize(),
                 
                 When(ChapterUnlockFailedEvent)
@@ -109,16 +109,33 @@ namespace PaymentAPI.Application.Sagas
             During(RefundingWallet,
                 When(WalletRefundedEvent)
                     .Then(context => context.Saga.UpdatedAt = DateTime.UtcNow)
-                    .RespondAsync(context => context.Init<PurchaseFailedEvent>(new 
-                    {
+                    .ThenAsync(context => FinishAsync(context, new PurchaseFailedEvent(
                         context.Saga.CorrelationId,
-                        Reason = context.Saga.ErrorReason ?? "Saga failed and refunded",
-                        context.Saga.TransactionId
-                    }))
+                        context.Saga.ErrorReason ?? "Saga failed and refunded",
+                        context.Saga.TransactionId)))
                     .TransitionTo(Failed)
             );
 
             SetCompletedWhenFinalized();
+        }
+
+        // Ends the purchase, once per final transition:
+        // 1. Publishes the result, which PurchaseCompletedConsumer / PurchaseFailedConsumer use to update the
+        //    Transaction (before T41 this publish came from RespondAsync, which publishes when there is no response address).
+        // 2. Answers the original SubmitPurchaseCommand request, if the saga stored one. Sagas created before the
+        //    RequestId / ResponseAddress columns existed have nulls here and skip this step.
+        private static async Task FinishAsync<TEvent, TResult>(BehaviorContext<PurchaseState, TEvent> context, TResult result)
+            where TEvent : class
+            where TResult : class
+        {
+            await context.Publish(result);
+
+            if (context.Saga.ResponseAddress == null || context.Saga.RequestId == null)
+                return;
+
+            var requestId = context.Saga.RequestId;
+            var endpoint = await context.GetSendEndpoint(context.Saga.ResponseAddress);
+            await endpoint.Send(result, sendContext => sendContext.RequestId = requestId);
         }
     }
 }

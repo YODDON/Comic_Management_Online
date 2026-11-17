@@ -152,7 +152,8 @@ namespace PaymentAPI.Application.Features.Payments.Commands
                         {
                             ChapterId = request.ChapterId,
                             Price = price,
-                            RemainingBalance = completed.Message.RemainingBalance,
+                            // The saga does not know the balance and sends -1: answer "unknown" (null), never a negative balance.
+                            RemainingBalance = completed.Message.RemainingBalance < 0 ? null : completed.Message.RemainingBalance,
                             AlreadyPurchased = false
                         },
                         "Mở khóa chapter thành công.");

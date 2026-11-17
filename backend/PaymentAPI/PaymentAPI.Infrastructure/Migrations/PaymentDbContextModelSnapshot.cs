@@ -219,6 +219,12 @@ namespace PaymentAPI.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ResponseAddress")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid>("TransactionId")
                         .HasColumnType("uniqueidentifier");
 

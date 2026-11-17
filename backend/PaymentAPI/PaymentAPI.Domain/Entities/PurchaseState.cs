@@ -24,5 +24,10 @@ namespace PaymentAPI.Domain.Entities
         
         // Optional error reason tracking
         public string? ErrorReason { get; set; }
+
+        // The original SubmitPurchaseCommand request (IRequestClient in PurchaseChapterCommandHandler), so the saga can
+        // answer it from a later event. Null for sagas created before these columns existed, or started without a request.
+        public Guid? RequestId { get; set; }
+        public Uri? ResponseAddress { get; set; }
     }
 }
