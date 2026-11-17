@@ -273,8 +273,8 @@ public class SePayWebhookTests
 
     private static ProcessSePayWebhookCommandHandler HandlerWith(IServiceProvider sp, IPaymentRepository repository) => new(
         repository,
-        sp.GetRequiredService<ChapterAPI.Protos.ChapterGrpc.ChapterGrpcClient>(),
-        sp.GetRequiredService<WalletAPI.Protos.WalletService.WalletServiceClient>(),
+        sp.GetRequiredService<SharedKernel.Contracts.Modules.IPaymentChapterGateway>(),
+        sp.GetRequiredService<SharedKernel.Contracts.Modules.IPaymentWalletGateway>(),
         sp.GetRequiredService<IRequestClient<SubmitPurchaseCommand>>(),
         Options.Create(new TopUpSettings { CoinRate = 1m }),
         Options.Create(TestWorld.DefaultBank));
@@ -603,8 +603,8 @@ public class SePayWebhookTests
         var sp = scope.ServiceProvider;
         var handler = new ProcessSePayWebhookCommandHandler(
             sp.GetRequiredService<IPaymentRepository>(),
-            sp.GetRequiredService<ChapterAPI.Protos.ChapterGrpc.ChapterGrpcClient>(),
-            sp.GetRequiredService<WalletAPI.Protos.WalletService.WalletServiceClient>(),
+            sp.GetRequiredService<SharedKernel.Contracts.Modules.IPaymentChapterGateway>(),
+            sp.GetRequiredService<SharedKernel.Contracts.Modules.IPaymentWalletGateway>(),
             sp.GetRequiredService<IRequestClient<SubmitPurchaseCommand>>(),
             Options.Create(new TopUpSettings { CoinRate = 2m }),
             Options.Create(TestWorld.DefaultBank));

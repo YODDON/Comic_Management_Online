@@ -118,7 +118,8 @@ public sealed class TestWorld : IAsyncDisposable
     private IHost _payment = null!, _wallet = null!, _chapter = null!;
 
     public WorldOptions Options { get; }
-    public InProcessCallInvoker Grpc { get; } = new();
+    /// <summary>Call log and failure switch for the Payment to Chapter/Wallet calls (name kept from the gRPC days, T17).</summary>
+    public ModuleCallLog Grpc { get; } = new();
     public MessageLog Messages { get; } = new();
     public StateLog States { get; } = new();
 
@@ -198,7 +199,6 @@ public sealed class TestWorld : IAsyncDisposable
             });
         }
 
-        RouteGrpc();
 
         foreach (var host in _hosts)
         {
@@ -232,8 +232,11 @@ public sealed class TestWorld : IAsyncDisposable
         s.AddScoped<IPaymentRepository, PaymentRepository>();
         s.AddSingleton(Microsoft.Extensions.Options.Options.Create(DefaultBank));
         s.AddSingleton(Microsoft.Extensions.Options.Options.Create(new TopUpSettings()));
-        s.AddSingleton(new ChapterAPI.Protos.ChapterGrpc.ChapterGrpcClient(Grpc));
-        s.AddSingleton(new WalletAPI.Protos.WalletService.WalletServiceClient(Grpc));
+        // The REAL gateways of the Chapter and Wallet modules, each running in its own host/container as the gRPC servers did.
+        s.AddSingleton<SharedKernel.Contracts.Modules.IPaymentChapterGateway>(_ => new RecordingChapterGateway(
+            new chapterserver::ChapterAPI.ModuleServices.PaymentChapterGateway(_chapter.Services.GetRequiredService<IServiceScopeFactory>()), Grpc));
+        s.AddSingleton<SharedKernel.Contracts.Modules.IPaymentWalletGateway>(_ => new RecordingWalletGateway(
+            new walletserver::WalletAPI.ModuleServices.PaymentWalletGateway(_wallet.Services.GetRequiredService<IServiceScopeFactory>()), Grpc));
         s.AddMediatR(c => c.RegisterServicesFromAssemblies(typeof(PurchaseChapterCommandHandler).Assembly));
     }
 
@@ -317,34 +320,6 @@ public sealed class TestWorld : IAsyncDisposable
     private static void ChapterEndpoints(IBusFactoryConfigurator cfg, IBusRegistrationContext ctx)
     {
         cfg.ReceiveEndpoint("unlock-chapter", e => e.ConfigureConsumer<UnlockChapterConsumer>(ctx));
-    }
-
-    // ---------- gRPC: real server classes, called in-process ----------
-    private void RouteGrpc()
-    {
-        Grpc.Route("/wallet.WalletService/AddCoin", async bytes =>
-        {
-            var request = walletserver::WalletAPI.Protos.AddCoinRequest.Parser.ParseFrom(bytes);
-            using var scope = WalletScope();
-            var service = ActivatorUtilities.CreateInstance<walletserver::WalletAPI.GrpcServices.WalletGrpcService>(scope.ServiceProvider);
-            return Google.Protobuf.MessageExtensions.ToByteArray(await service.AddCoin(request, null!));
-        });
-
-        Grpc.Route("/chapter.ChapterGrpc/GetChapterInfo", async bytes =>
-        {
-            var request = chapterserver::ChapterAPI.Protos.GetChapterInfoRequest.Parser.ParseFrom(bytes);
-            using var scope = ChapterScope();
-            var service = ActivatorUtilities.CreateInstance<chapterserver::ChapterAPI.GrpcServices.ChapterGrpcService>(scope.ServiceProvider);
-            return Google.Protobuf.MessageExtensions.ToByteArray(await service.GetChapterInfo(request, null!));
-        });
-
-        Grpc.Route("/chapter.ChapterGrpc/UnlockChapter", async bytes =>
-        {
-            var request = chapterserver::ChapterAPI.Protos.UnlockChapterRequest.Parser.ParseFrom(bytes);
-            using var scope = ChapterScope();
-            var service = ActivatorUtilities.CreateInstance<chapterserver::ChapterAPI.GrpcServices.ChapterGrpcService>(scope.ServiceProvider);
-            return Google.Protobuf.MessageExtensions.ToByteArray(await service.UnlockChapter(request, null!));
-        });
     }
 
     // ---------- seeding and reading (through the real repositories / contexts) ----------

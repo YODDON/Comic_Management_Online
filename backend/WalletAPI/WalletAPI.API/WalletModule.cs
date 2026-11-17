@@ -19,6 +19,9 @@ public static class WalletModule
         services.AddScoped<IWithdrawRepository, WithdrawRepository>();
         services.AddScoped<IWalletRepository, WalletRepository>();
 
+        // In-process replacement for the gRPC call PaymentAPI -> WalletAPI (T17).
+        services.AddScoped<SharedKernel.Contracts.Modules.IPaymentWalletGateway, WalletAPI.ModuleServices.PaymentWalletGateway>();
+
         var walletConn = Environment.GetEnvironmentVariable("WALLET_DB_CONNECTION")
             ?? configuration.GetConnectionString("WalletConnection")
             ?? configuration.GetConnectionString("DefaultConnection");

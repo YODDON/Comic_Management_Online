@@ -27,8 +27,8 @@ public class DepositTests
 
     private static CreateDepositCommandHandler HandlerWith(IServiceProvider sp, BankSettings bank) => new(
         sp.GetRequiredService<IPaymentRepository>(),
-        sp.GetRequiredService<ChapterAPI.Protos.ChapterGrpc.ChapterGrpcClient>(),
-        sp.GetRequiredService<WalletAPI.Protos.WalletService.WalletServiceClient>(),
+        sp.GetRequiredService<SharedKernel.Contracts.Modules.IPaymentChapterGateway>(),
+        sp.GetRequiredService<SharedKernel.Contracts.Modules.IPaymentWalletGateway>(),
         sp.GetRequiredService<IRequestClient<SubmitPurchaseCommand>>(),
         Options.Create(new TopUpSettings()),
         Options.Create(bank));

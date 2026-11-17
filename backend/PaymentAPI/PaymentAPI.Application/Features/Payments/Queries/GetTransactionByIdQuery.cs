@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Globalization;
-using Grpc.Core;
 using MediatR;
 using MassTransit;
 using SharedKernel.Responses;
@@ -13,8 +12,7 @@ using PaymentAPI.DTOs;
 using PaymentAPI.Entities;
 using PaymentAPI.Interfaces;
 using PaymentAPI.Settings;
-using ChapterAPI.Protos;
-using WalletAPI.Protos;
+using SharedKernel.Contracts.Modules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SharedKernel.Events;
@@ -32,17 +30,17 @@ namespace PaymentAPI.Application.Features.Payments.Queries
     {
         private const string VietQrImageBaseUrl = "https://img.vietqr.io/image";
         private readonly IPaymentRepository _repository;
-        private readonly ChapterGrpc.ChapterGrpcClient _chapterGrpcClient;
-        private readonly WalletService.WalletServiceClient _walletGrpcClient;
+        private readonly IPaymentChapterGateway _chapterGateway;
+        private readonly IPaymentWalletGateway _walletGateway;
         private readonly IRequestClient<SubmitPurchaseCommand> _purchaseClient;
         private readonly TopUpSettings _topUpSettings;
         private readonly BankSettings _bankSettings;
 
-        public GetTransactionByIdQueryHandler(IPaymentRepository repository, ChapterGrpc.ChapterGrpcClient chapterGrpcClient, WalletService.WalletServiceClient walletGrpcClient, IRequestClient<SubmitPurchaseCommand> purchaseClient, IOptions<TopUpSettings> topUpOptions, IOptions<BankSettings> bankOptions)
+        public GetTransactionByIdQueryHandler(IPaymentRepository repository, IPaymentChapterGateway chapterGateway, IPaymentWalletGateway walletGateway, IRequestClient<SubmitPurchaseCommand> purchaseClient, IOptions<TopUpSettings> topUpOptions, IOptions<BankSettings> bankOptions)
         {
             _repository = repository;
-            _chapterGrpcClient = chapterGrpcClient;
-            _walletGrpcClient = walletGrpcClient;
+            _chapterGateway = chapterGateway;
+            _walletGateway = walletGateway;
             _purchaseClient = purchaseClient;
             _topUpSettings = topUpOptions.Value;
             _bankSettings = bankOptions.Value;
@@ -118,19 +116,17 @@ private async Task<bool> CreditWalletForTopUpAsync(Transaction transaction)
 
             try
             {
-                var response = await _walletGrpcClient.AddCoinAsync(new AddCoinRequest
-                {
-                    UserId = transaction.UserId.ToString(),
-                    Amount = (double)coins,
-                    ReferenceId = transaction.Id.ToString(),
-                    Description = $"Top-up {transaction.TransactionCode}",
+                var response = await _walletGateway.AddCoinAsync(
+                    transaction.UserId,
+                    coins,
+                    transaction.Id,
+                    $"Top-up {transaction.TransactionCode}",
                     // Real money in — the only kind of credit that may later be withdrawn as cash.
-                    CreditType = SharedKernel.Enums.TransactionType.ManualTopUp.ToString()
-                });
+                    SharedKernel.Enums.TransactionType.ManualTopUp.ToString());
 
                 return response.Success;
             }
-            catch (RpcException)
+            catch (ModuleCallException)
             {
                 // Wallet unreachable: leave the transaction Pending so it can be retried,
                 // rather than completing it against a balance that never changed.
@@ -157,21 +153,15 @@ private async Task EnrichChapterTransactionsAsync(
             {
                 try
                 {
-                    var chapter = await _chapterGrpcClient.GetChapterInfoAsync(
-                        new GetChapterInfoRequest
-                        {
-                            ChapterId = transaction.ChapterId!.Value.ToString()
-                        });
+                    var chapter = await _chapterGateway.GetChapterInfoAsync(transaction.ChapterId!.Value);
                     if (!chapter.Exists) return;
 
-                    transaction.ComicId = Guid.TryParse(chapter.ComicId, out var comicId)
-                        ? comicId
-                        : null;
+                    transaction.ComicId = chapter.ComicId;
                     transaction.ChapterTitle = chapter.Title;
                     transaction.ChapterNumber = chapter.ChapterNumber;
                     transaction.ChapterSlug = chapter.Slug;
                 }
-                catch (RpcException)
+                catch (ModuleCallException)
                 {
                     // History remains available with ChapterId even if ChapterAPI is temporarily down.
                 }
