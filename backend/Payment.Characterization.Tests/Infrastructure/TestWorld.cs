@@ -99,13 +99,14 @@ public sealed class StateLog : IStateObserver<PurchaseState>
 public sealed class TestWorld : IAsyncDisposable
 {
     public static string RabbitMqHost => Environment.GetEnvironmentVariable("T37_RABBITMQ_HOST") ?? "localhost";
+    public static int RabbitMqPort => int.TryParse(Environment.GetEnvironmentVariable("T37_RABBITMQ_PORT"), out var port) ? port : 5672;
 
     public static bool RabbitMqReachable()
     {
         try
         {
             using var client = new System.Net.Sockets.TcpClient();
-            return client.ConnectAsync(RabbitMqHost, 5672).Wait(TimeSpan.FromMilliseconds(1500)) && client.Connected;
+            return client.ConnectAsync(RabbitMqHost, RabbitMqPort).Wait(TimeSpan.FromMilliseconds(1500)) && client.Connected;
         }
         catch
         {
@@ -121,11 +122,11 @@ public sealed class TestWorld : IAsyncDisposable
     public MessageLog Messages { get; } = new();
     public StateLog States { get; } = new();
 
-    /// <summary>
-    /// When set, UnlockChapterAsync on the Chapter repository throws (a "database failed" injection). Not used by T37:
-    /// the unlock-failure / refund path is unreachable while the saga faults at its first step. Kept for the fix task.
-    /// </summary>
+    /// <summary>When set, UnlockChapterAsync on the Chapter repository throws (a "database failed" injection).</summary>
     public volatile bool FailChapterUnlock;
+
+    /// <summary>When set, DebitAsync on the Wallet repository throws (a "database failed" injection).</summary>
+    public volatile bool FailWalletDebit;
 
     private TestWorld(WorldOptions options) => Options = options;
 
@@ -213,6 +214,9 @@ public sealed class TestWorld : IAsyncDisposable
         var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder(
             new HostApplicationBuilderSettings { DisableDefaults = true });
         builder.Services.AddLogging();
+        // Start returns only once the bus and its receive endpoints (and their RabbitMQ bindings) are ready.
+        // Without it, a test that publishes right after start on a fresh broker loses the message (unroutable).
+        builder.Services.Configure<MassTransitHostOptions>(o => o.WaitUntilStarted = true);
         configure(builder.Services);
         var host = builder.Build();
         _hosts.Add(host);
@@ -220,7 +224,7 @@ public sealed class TestWorld : IAsyncDisposable
     }
 
     private static void RabbitHost(IRabbitMqBusFactoryConfigurator cfg) =>
-        cfg.Host(RabbitMqHost, "/", h => { h.Username("guest"); h.Password("guest"); });
+        cfg.Host(RabbitMqHost, (ushort)RabbitMqPort, "/", h => { h.Username("guest"); h.Password("guest"); });
 
     private void AddPayment(IServiceCollection s, TestDatabases dbs)
     {
@@ -236,7 +240,12 @@ public sealed class TestWorld : IAsyncDisposable
     private void AddWallet(IServiceCollection s, TestDatabases dbs)
     {
         s.AddDbContext<WalletDbContext>(o => o.UseSqlServer(dbs.WalletConnection));
-        s.AddScoped<IWalletRepository, WalletRepository>();
+        s.AddScoped<IWalletRepository>(sp =>
+            FaultInjectingProxy.Wrap<IWalletRepository>(
+                ActivatorUtilities.CreateInstance<WalletRepository>(sp),
+                (method, _) => FailWalletDebit && method.Name == nameof(IWalletRepository.DebitAsync)
+                    ? new InvalidOperationException("injected: wallet database failed")
+                    : null));
         s.AddMediatR(c => c.RegisterServicesFromAssemblies(typeof(WalletAPI.Application.Features.Wallet.Commands.AddCoinCommand).Assembly));
     }
 

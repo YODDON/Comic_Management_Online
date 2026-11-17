@@ -137,9 +137,9 @@ namespace PaymentAPI.Repositories
 
         public async Task SaveFailedTransactionAsync(Transaction transaction)
         {
-            _context.Entry(transaction).State = EntityState.Detached;
             transaction.Status = SharedKernel.Enums.TransactionStatus.Failed;
-            _context.Transactions.Add(transaction);
+            // The transaction is already committed: update it, never insert it again.
+            _context.Transactions.Update(transaction);
             await _context.SaveChangesAsync();
         }
     }

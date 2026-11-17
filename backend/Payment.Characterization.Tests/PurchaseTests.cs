@@ -12,7 +12,7 @@ namespace Payment.Characterization.Tests;
 /// <summary>
 /// T37 characterization: POST /payments/purchased-chapter paths that end BEFORE the saga is started
 /// (already owned, chapter missing / unpublished / free, ChapterAPI unreachable). Expected values were observed by
-/// running the current code; the saga path itself is pinned in PurchaseKnownBugTests.
+/// running the current code; the saga path itself is pinned in PurchaseSagaTests.
 /// </summary>
 [Collection(T37Collection.Name)]
 public class PurchaseTests
