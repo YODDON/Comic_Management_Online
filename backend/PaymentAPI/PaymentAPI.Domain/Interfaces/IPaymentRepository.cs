@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using PaymentAPI.Domain.Entities;
 using PaymentAPI.Entities;
 
 namespace PaymentAPI.Interfaces
@@ -26,5 +27,41 @@ namespace PaymentAPI.Interfaces
         Task CommitTransactionAsync();
         Task RollbackTransactionAsync();
         Task SaveFailedTransactionAsync(Transaction transaction);
+
+        // ---- Purchase recovery job (T23) ----
+
+        /// <summary>Ids of Pending <c>Purchase</c> transactions created before <paramref name="createdBefore"/>, oldest first.</summary>
+        Task<List<Guid>> GetPendingPurchaseIdsAsync(DateTime createdBefore, int limit);
+
+        /// <summary>
+        /// Ids of Failed <c>Purchase</c> transactions whose note starts with <paramref name="notePrefix"/>, created after
+        /// <paramref name="createdAfter"/> (re-checked for a debit that arrived after the job failed them).
+        /// </summary>
+        Task<List<Guid>> GetFailedPurchaseIdsByNotePrefixAsync(string notePrefix, DateTime createdAfter, int limit);
+
+        /// <summary>
+        /// Transaction ids of saga rows in one of <paramref name="states"/> whose last activity
+        /// (<c>UpdatedAt ?? CreatedAt</c>) is before <paramref name="lastActivityBefore"/>.
+        /// </summary>
+        Task<List<Guid>> GetSagaTransactionIdsAsync(IReadOnlyCollection<string> states, DateTime lastActivityBefore, int limit);
+
+        /// <summary>The saga row of a transaction, not tracked, or null.</summary>
+        Task<PurchaseState?> GetPurchaseStateAsync(Guid transactionId);
+
+        /// <summary>
+        /// Inside <see cref="BeginTransactionAsync"/>: reads and locks (UPDLOCK, ROWLOCK) the saga row of a transaction,
+        /// tracked, or null. Same lock the saga's EF repository takes, so a running saga step and the job never update
+        /// the row at the same time.
+        /// </summary>
+        Task<PurchaseState?> LockPurchaseStateAsync(Guid transactionId);
+
+        /// <summary>
+        /// Inside <see cref="BeginTransactionAsync"/>: reads and locks (UPDLOCK, ROWLOCK) a transaction, tracked, or null.
+        /// A later <see cref="GetTransactionByIdAsync"/> in the same scope returns this tracked row.
+        /// </summary>
+        Task<Transaction?> LockTransactionAsync(Guid id);
+
+        Task UpdatePurchaseStateAsync(PurchaseState state);
+        Task RemovePurchaseStateAsync(PurchaseState state);
     }
 }

@@ -128,6 +128,7 @@ public sealed class TestWorld : IAsyncDisposable
     public WorldOptions Options { get; }
     /// <summary>Call log and failure switch for the Payment to Chapter/Wallet calls (name kept from the gRPC days, T17).</summary>
     public ModuleCallLog Grpc { get; } = new();
+    public PaymentAPI.Settings.PurchaseRecoverySettings RecoverySettings { get; } = new();
     public MessageLog Messages { get; } = new();
     public StateLog States { get; } = new();
 
@@ -253,6 +254,10 @@ public sealed class TestWorld : IAsyncDisposable
         s.AddSingleton<SharedKernel.Contracts.Modules.IPaymentWalletGateway>(_ => new RecordingWalletGateway(
             new walletserver::WalletAPI.ModuleServices.PaymentWalletGateway(_wallet.Services.GetRequiredService<IServiceScopeFactory>()), Grpc));
         s.AddMediatR(c => c.RegisterServicesFromAssemblies(typeof(PurchaseChapterCommandHandler).Assembly));
+        // T23: the purchase recovery job, as AddPaymentModule registers it, but NOT its hosted service: tests call
+        // RunOnceAsync themselves. RecoverySettings can be changed by a test before the first run.
+        s.AddSingleton<IOptions<PaymentAPI.Settings.PurchaseRecoverySettings>>(_ => Microsoft.Extensions.Options.Options.Create(RecoverySettings));
+        s.AddSingleton<PaymentAPI.Application.Services.PurchaseRecoveryJob>();
     }
 
     private void AddWallet(IServiceCollection s, TestDatabases dbs)

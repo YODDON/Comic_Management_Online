@@ -15,8 +15,19 @@ public sealed class ModuleCallLog
     public const string UnlockChapter = "/chapter.ChapterGrpc/UnlockChapter";
     public const string AddCoin = "/wallet.WalletService/AddCoin";
 
+    // Added by T23 (purchase recovery job); never gRPC methods, named the same way for the log.
+    public const string IsChapterUnlocked = "/chapter.ChapterGrpc/IsChapterUnlocked";
+    public const string GetLedgerEntry = "/wallet.WalletService/GetLedgerEntry";
+    public const string RefundPurchase = "/wallet.WalletService/RefundPurchase";
+
     /// <summary>Full method names that currently fail with <see cref="ModuleCallException"/>.</summary>
     public HashSet<string> Unavailable { get; } = new();
+
+    /// <summary>
+    /// T23: runs after every <c>IsChapterUnlocked</c> answer (user id, chapter id), before the caller continues. Lets a
+    /// test change the world between the recovery job's read and its locked re-check.
+    /// </summary>
+    public Func<int, Guid, Task>? AfterUnlockCheck { get; set; }
 
     /// <summary>Every call made, in order, by full method name.</summary>
     public List<string> Calls { get; } = new();
@@ -53,6 +64,14 @@ public sealed class RecordingChapterGateway : IPaymentChapterGateway
         _log.Enter(ModuleCallLog.UnlockChapter);
         return _inner.UnlockChapterAsync(userId, chapterId, cancellationToken);
     }
+
+    public async Task<bool> IsChapterUnlockedAsync(int userId, Guid chapterId, CancellationToken cancellationToken = default)
+    {
+        _log.Enter(ModuleCallLog.IsChapterUnlocked);
+        var unlocked = await _inner.IsChapterUnlockedAsync(userId, chapterId, cancellationToken);
+        if (_log.AfterUnlockCheck is { } hook) await hook(userId, chapterId);
+        return unlocked;
+    }
 }
 
 /// <summary>The REAL <c>PaymentWalletGateway</c> (Wallet module) behind a call log and a failure switch.</summary>
@@ -73,5 +92,18 @@ public sealed class RecordingWalletGateway : IPaymentWalletGateway
     {
         _log.Enter(ModuleCallLog.AddCoin);
         return _inner.AddCoinAsync(userId, amount, referenceId, description, creditType, cancellationToken);
+    }
+
+    public Task<WalletLedgerEntry?> GetLedgerEntryAsync(Guid referenceId, CancellationToken cancellationToken = default)
+    {
+        _log.Enter(ModuleCallLog.GetLedgerEntry);
+        return _inner.GetLedgerEntryAsync(referenceId, cancellationToken);
+    }
+
+    public Task<WalletCreditResult> RefundPurchaseAsync(
+        int userId, decimal amount, Guid transactionId, CancellationToken cancellationToken = default)
+    {
+        _log.Enter(ModuleCallLog.RefundPurchase);
+        return _inner.RefundPurchaseAsync(userId, amount, transactionId, cancellationToken);
     }
 }

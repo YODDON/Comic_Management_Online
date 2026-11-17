@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
 using MassTransit;
+using PaymentAPI.Application.Services;
 using PaymentAPI.Interfaces;
 using SharedKernel.Contracts.Purchase;
-using SharedKernel.Enums;
 
 namespace PaymentAPI.Application.Consumers
 {
@@ -18,18 +18,10 @@ namespace PaymentAPI.Application.Consumers
         public async Task Consume(ConsumeContext<PurchaseFailedEvent> context)
         {
             var msg = context.Message;
-            
-            await _repository.BeginTransactionAsync();
-            var transaction = await _repository.GetTransactionByIdAsync(msg.TransactionId);
-            if (transaction == null || transaction.Status != TransactionStatus.Pending)
-            {
-                await _repository.CommitTransactionAsync();
-                return;
-            }
 
-            transaction.Status = TransactionStatus.Failed;
-            transaction.Note = msg.Reason;
-            await _repository.UpdateTransactionAsync(transaction);
+            await _repository.BeginTransactionAsync();
+            // Same steps as before T23, moved to PurchaseOutcomes so the purchase recovery job reuses them.
+            await PurchaseOutcomes.RecordFailedAsync(_repository, msg.TransactionId, msg.Reason);
             await _repository.CommitTransactionAsync();
         }
     }

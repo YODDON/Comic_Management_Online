@@ -24,7 +24,32 @@ public interface IPaymentWalletGateway
         string description,
         string creditType,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the wallet ledger entry with this reference id, or null when there is none. Read only. Used by the
+    /// purchase recovery job (T23) to see whether a purchase was debited (<c>ReferenceId == TransactionId</c>) or
+    /// refunded (<c>PurchaseReferenceIds.RefundOf</c>). Any failure is a <see cref="ModuleCallException"/>.
+    /// </summary>
+    Task<WalletLedgerEntry?> GetLedgerEntryAsync(Guid referenceId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Refunds a chapter purchase: credits <paramref name="amount"/> as <c>TransactionType.Refund</c> with the
+    /// reference id <c>PurchaseReferenceIds.RefundOf(transactionId)</c> and the same description as
+    /// <c>RefundWalletConsumer</c>. Idempotent: a second call does not credit again and still answers
+    /// <see cref="WalletCreditResult.Success"/> true. Any failure is a <see cref="ModuleCallException"/>.
+    /// </summary>
+    Task<WalletCreditResult> RefundPurchaseAsync(
+        int userId,
+        decimal amount,
+        Guid transactionId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Fields of the gRPC <c>AddCoinResponse</c>.</summary>
 public sealed record WalletCreditResult(bool Success, string Message);
+
+/// <summary>
+/// One wallet ledger entry (<c>CurrencyEntry</c>). <see cref="Amount"/> is signed: a debit is negative.
+/// <see cref="Type"/> is the <c>SharedKernel.Enums.TransactionType</c> name, for example "Purchase" or "Refund".
+/// </summary>
+public sealed record WalletLedgerEntry(int UserId, decimal Amount, string Type);

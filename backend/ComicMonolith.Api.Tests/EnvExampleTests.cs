@@ -105,4 +105,15 @@ public class EnvExampleTests
             Assert.Equal("CHANGE_ME", value);
         }
     }
+
+    [Fact]
+    public void The_purchase_recovery_variables_match_the_code_defaults()
+    {
+        var active = ActiveSettings();
+        var defaults = new PaymentAPI.Settings.PurchaseRecoverySettings();
+
+        Assert.Equal(defaults.Enabled.ToString().ToLowerInvariant(), active["PurchaseRecovery__Enabled"]);
+        Assert.Equal(defaults.StuckAfterMinutes.ToString(), active["PurchaseRecovery__StuckAfterMinutes"]);
+        Assert.Equal(defaults.IntervalMinutes.ToString(), active["PurchaseRecovery__IntervalMinutes"]);
+    }
 }

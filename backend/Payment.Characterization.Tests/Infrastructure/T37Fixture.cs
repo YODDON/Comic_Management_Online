@@ -43,6 +43,7 @@ public sealed class T37Fixture : IAsyncLifetime
     private static TestWorld Reset(TestWorld world)
     {
         world.Grpc.Unavailable.Clear();
+        world.Grpc.AfterUnlockCheck = null;
         world.FailChapterUnlock = false;
         world.FailWalletDebit = false;
         world.Messages.Clear();

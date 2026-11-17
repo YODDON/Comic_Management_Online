@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PaymentAPI.Application.Consumers;
 using PaymentAPI.Application.Sagas;
+using PaymentAPI.Application.Services;
 using PaymentAPI.Controllers;
 using PaymentAPI.Data;
 using PaymentAPI.Domain.Entities;
@@ -32,6 +33,11 @@ public static class PaymentModule
 
         services.Configure<TopUpSettings>(configuration.GetSection(TopUpSettings.SectionName));
         services.Configure<BankSettings>(configuration.GetSection(BankSettings.SectionName));
+
+        // Settles purchases left stuck by a crash or restart (T23): the in-memory bus loses saga messages in flight.
+        services.Configure<PurchaseRecoverySettings>(configuration.GetSection(PurchaseRecoverySettings.SectionName));
+        services.AddSingleton<PurchaseRecoveryJob>();
+        services.AddHostedService<PurchaseRecoveryService>();
 
         // Not registered here: MassTransit. The host owns the single bus and calls AddPaymentConsumers /
         // ConfigurePaymentEndpoints below (T20). The host bus has no EF Outbox until T22 decides.

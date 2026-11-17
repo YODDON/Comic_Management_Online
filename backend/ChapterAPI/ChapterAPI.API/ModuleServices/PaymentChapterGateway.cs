@@ -76,4 +76,22 @@ public sealed class PaymentChapterGateway : IPaymentChapterGateway
             throw new ModuleCallException("ChapterAPI could not unlock the chapter.", ex);
         }
     }
+
+    public async Task<bool> IsChapterUnlockedAsync(int userId, Guid chapterId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+            return await mediator.Send(new IsChapterPurchasedQuery { UserId = userId, ChapterId = chapterId }, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new ModuleCallException("ChapterAPI could not read the chapter unlock.", ex);
+        }
+    }
 }
