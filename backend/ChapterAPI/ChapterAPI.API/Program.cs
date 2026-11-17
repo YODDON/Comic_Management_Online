@@ -1,3 +1,4 @@
+using ChapterAPI;
 using Microsoft.EntityFrameworkCore;
 using ChapterAPI.Data;
 
@@ -17,32 +18,18 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-builder.Services.AddControllers();
 builder.Services.AddGrpc();
 
-builder.Services.Configure<ChapterAPI.Settings.CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
-builder.Services.AddScoped<ChapterAPI.Interfaces.ICloudinaryService, ChapterAPI.Services.CloudinaryService>();
-
-var chapterConn = Environment.GetEnvironmentVariable("CHAPTER_DB_CONNECTION") ?? builder.Configuration.GetConnectionString("ChapterConnection");
-if (string.IsNullOrEmpty(chapterConn))
+// Controllers, DbContext, Cloudinary, repositories, AutoMapper, MediatR: see ChapterModule.cs.
+// Note: the module has no localhost connection fallback; the standalone API keeps it below.
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CHAPTER_DB_CONNECTION"))
+    && string.IsNullOrEmpty(builder.Configuration.GetConnectionString("ChapterConnection")))
 {
-    chapterConn = "Server=localhost;Database=ChapterDB;Trusted_Connection=True;TrustServerCertificate=True;";
+    builder.Configuration["ConnectionStrings:ChapterConnection"] =
+        "Server=localhost;Database=ChapterDB;Trusted_Connection=True;TrustServerCertificate=True;";
 }
-builder.Services.AddDbContext<ChapterDbContext>(options => options.UseSqlServer(chapterConn));
-
-var apiGatewayUrl = Environment.GetEnvironmentVariable("API_GATEWAY_URL") 
-    ?? builder.Configuration["ApiGateway:BaseUrl"] 
-    ?? "http://localhost:5028";
-builder.Services.AddHttpClient<IComicValidator, ComicValidator>(client =>
-{
-    client.BaseAddress = new Uri(apiGatewayUrl + "/api");
-});
-
-builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
-builder.Services.AddScoped<IChapterRepository, ChapterRepository>();
-builder.Services.AddScoped<IMissionProgressNotifier, MissionProgressNotifier>();
-// Add MediatR for CQRS
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ChapterAPI.Application.Features.Chapters.Queries.GetChapterInfoQuery).Assembly));
+builder.Services.AddChapterModule(builder.Configuration);
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ChapterAPI.Application.Features.Chapters.Queries.GetChapterInfoQuery).Assembly)).AddAutoMapper(typeof(ChapterAPI.Mappings.ChapterMappingProfile).Assembly);
 
 builder.Services.AddMassTransit(x =>
 {
@@ -76,11 +63,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetService<ChapterDbContext>();
-    db?.Database.Migrate();
-}
+app.UseChapterModule();
 
 app.MapGrpcService<ChapterAPI.GrpcServices.ChapterGrpcService>();
 

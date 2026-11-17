@@ -1,8 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-using BannerAPI.Data;
-using BannerAPI.Interfaces;
-using BannerAPI.Repositories;
-using BannerAPI.Services;
+using BannerAPI;
 using SharedKernel.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,19 +6,8 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-builder.Services.AddControllers();
-builder.Services.AddScoped<IBannerRepository, BannerRepository>();
-builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
-
+builder.Services.AddBannerModule(builder.Configuration);
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(BannerAPI.Application.Features.Banners.Commands.CreateBannerCommand).Assembly));
-
-var bannerConn = Environment.GetEnvironmentVariable("BANNER_DB_CONNECTION")
-    ?? builder.Configuration.GetConnectionString("BannerConnection")
-    ?? builder.Configuration.GetConnectionString("DefaultConnection");
-if (!string.IsNullOrEmpty(bannerConn))
-{
-    builder.Services.AddDbContext<BannerDbContext>(options => options.UseSqlServer(bannerConn));
-}
 
 builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 
@@ -31,11 +16,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetService<BannerDbContext>();
-    db?.Database.Migrate();
-}
+app.UseBannerModule();
 
 if (app.Environment.IsDevelopment())
 {

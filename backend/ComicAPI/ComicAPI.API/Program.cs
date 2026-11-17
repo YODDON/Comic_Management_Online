@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using SharedKernel.Extensions;
 using MassTransit;
+using ComicAPI.API;
 using ComicAPI.API.Consumers;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,13 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-builder.Services.AddControllers();
-
-var comicConn = Environment.GetEnvironmentVariable("COMIC_DB_CONNECTION") ?? builder.Configuration.GetConnectionString("ComicConnection");
-if (!string.IsNullOrEmpty(comicConn))
-{
-    builder.Services.AddDbContext<ComicDbContext>(options => options.UseSqlServer(comicConn));
-}
+builder.Services.AddComicModule(builder.Configuration);
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ComicAPI.Application.Features.Comics.Queries.GetComicsQuery).Assembly)).AddAutoMapper(typeof(ComicAPI.Application.Mappings.ComicProfile).Assembly);
 
 var redisConn = Environment.GetEnvironmentVariable("REDIS_CONNECTION") ?? builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
 builder.Services.AddStackExchangeRedisCache(options =>
@@ -54,29 +50,6 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-builder.Services.Configure<ComicAPI.Infrastructure.Settings.CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
-builder.Services.AddScoped<ComicAPI.Application.Interfaces.ICloudinaryService, ComicAPI.Infrastructure.Services.CloudinaryService>();
-
-builder.Services.AddAutoMapper(typeof(ComicAPI.Application.Mappings.ComicProfile).Assembly);
-
-var userApiUrl = Environment.GetEnvironmentVariable("USER_API_URL") ?? builder.Configuration["GrpcSettings:UserApiUrl"] ?? "http://localhost:5054";
-builder.Services.AddGrpcClient<UserAPI.Protos.UserService.UserServiceClient>(o =>
-{
-    o.Address = new Uri(userApiUrl);
-});
-
-var chapterApiUrl = Environment.GetEnvironmentVariable("CHAPTER_API_URL")
-    ?? builder.Configuration["GrpcEndpoints:ChapterAPI"]
-    ?? "http://localhost:5115";
-builder.Services.AddGrpcClient<ChapterAPI.Protos.ChapterGrpc.ChapterGrpcClient>(o =>
-{
-    o.Address = new Uri(chapterApiUrl);
-});
-
-builder.Services.AddScoped<ComicAPI.Domain.Interfaces.ICategoryRepository, ComicAPI.Infrastructure.Repositories.CategoryRepository>();
-builder.Services.AddScoped<ComicAPI.Domain.Interfaces.IComicRepository, ComicAPI.Infrastructure.Repositories.ComicRepository>();
-
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ComicAPI.Application.Features.Comics.Queries.GetComicsQuery).Assembly));
 
 builder.Services.AddMassTransit(x =>
 {

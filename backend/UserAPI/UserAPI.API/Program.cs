@@ -1,11 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using UserAPI.Infrastructure.Data;
-using UserAPI.Application.Interfaces; using UserAPI.Domain.Interfaces;
-using UserAPI.Infrastructure.Repositories;
-using UserAPI.Application.Services; using UserAPI.Infrastructure.Services;
+using UserAPI.API;
 using SharedKernel.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,25 +6,11 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-builder.Services.AddControllers();
-
-var userConn = Environment.GetEnvironmentVariable("AUTH_DB_CONNECTION") ?? builder.Configuration.GetConnectionString("AuthConnection");
-if (!string.IsNullOrEmpty(userConn))
-{
-    builder.Services.AddDbContext<UserDbContext>(options => options.UseSqlServer(userConn));
-}
+builder.Services.AddUserModule(builder.Configuration);
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(UserAPI.Application.DTOs.UserProfileDto).Assembly));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-builder.Services.AddMemoryCache();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IAdminUserRepository, AdminUserRepository>();
-builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IAvatarStorageService, AvatarStorageService>();
-
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(UserAPI.Application.DTOs.UserProfileDto).Assembly));
 
 builder.Services.AddGrpc();
 builder.Services.AddGrpcReflection();
@@ -40,11 +19,7 @@ builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetService<UserDbContext>();
-    db?.Database.Migrate();
-}
+app.UseUserModule();
 
 if (app.Environment.IsDevelopment())
 {

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DotNetEnv" Version="3.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.12" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SharedKernel\SharedKernel.csproj" />
+    <ProjectReference Include="..\BannerAPI\BannerAPI.API\BannerAPI.API.csproj" />
+    <ProjectReference Include="..\ChapterAPI\ChapterAPI.API\ChapterAPI.API.csproj" />
+    <ProjectReference Include="..\ComicAPI\ComicAPI.API\ComicAPI.API.csproj" />
+    <ProjectReference Include="..\MissionAPI\MissionAPI.API\MissionAPI.API.csproj" />
+    <ProjectReference Include="..\PaymentAPI\PaymentAPI.API\PaymentAPI.API.csproj" />
+    <ProjectReference Include="..\SocialAPI\SocialAPI.API\SocialAPI.API.csproj" />
+    <ProjectReference Include="..\UserAPI\UserAPI.API\UserAPI.API.csproj" />
+    <ProjectReference Include="..\WalletAPI\WalletAPI.API\WalletAPI.API.csproj" />
+  </ItemGroup>
+
+</Project>
