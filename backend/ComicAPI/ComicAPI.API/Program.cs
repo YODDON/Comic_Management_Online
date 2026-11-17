@@ -16,13 +16,6 @@ builder.Configuration.AddEnvironmentVariables();
 builder.Services.AddComicModule(builder.Configuration);
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ComicAPI.Application.Features.Comics.Queries.GetComicsQuery).Assembly)).AddAutoMapper(typeof(ComicAPI.Application.Mappings.ComicProfile).Assembly);
 
-var redisConn = Environment.GetEnvironmentVariable("REDIS_CONNECTION") ?? builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
-builder.Services.AddStackExchangeRedisCache(options =>
-{
-    options.Configuration = redisConn;
-    options.InstanceName = "ComicAPI_";
-});
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

@@ -19,7 +19,7 @@ public static class ComicModule
         }
 
         // Used by GetHotComics, GetOutstandingComicsList and GetLastCompletedComics (IDistributedCache).
-        // The standalone API still uses Redis; the host uses the in-memory cache (T19 finishes the switch).
+        // In-memory cache for both the host and the standalone API (Redis removed in T19).
         services.AddDistributedMemoryCache();
 
         services.Configure<ComicAPI.Infrastructure.Settings.CloudinarySettings>(configuration.GetSection("Cloudinary"));

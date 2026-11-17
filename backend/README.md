@@ -69,7 +69,6 @@ docker-compose up -d
 
 Lệnh này tải và chạy các container:
 - **SQL Server 2022** — port `1433`
-- **Redis** — port `6379`
 - **RabbitMQ** — port `5672` (AMQP) và `15672` (management UI)
 
 Kiểm tra trạng thái container: `docker ps`.
