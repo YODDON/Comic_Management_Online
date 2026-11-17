@@ -1,7 +1,5 @@
-using Microsoft.EntityFrameworkCore;
+using MissionAPI;
 using MissionAPI.Data;
-using ChapterAPI.Protos;
-using SocialAPI.Protos;
 using MassTransit;
 using MissionAPI.Consumers;
 using SharedKernel.Extensions;
@@ -11,41 +9,17 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-builder.Services.AddControllers();
 builder.Services.AddGrpc();
 
-var missionConn = Environment.GetEnvironmentVariable("MISSION_DB_CONNECTION") 
-    ?? builder.Configuration.GetConnectionString("MissionConnection")
-    ?? "Server=localhost,1433;Database=MissionDB;User Id=sa;Password=Your_password123;TrustServerCertificate=True;";
-if (!string.IsNullOrEmpty(missionConn))
+// Controllers, DbContext, repositories, upload/Cloudinary, MediatR, gRPC clients: see MissionModule.cs.
+// Note: the module has no localhost connection fallback; the standalone API keeps it below.
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MISSION_DB_CONNECTION"))
+    && string.IsNullOrEmpty(builder.Configuration.GetConnectionString("MissionConnection")))
 {
-    builder.Services.AddDbContext<MissionDbContext>(options => options.UseSqlServer(missionConn));
+    builder.Configuration["ConnectionStrings:MissionConnection"] =
+        "Server=localhost,1433;Database=MissionDB;User Id=sa;Password=Your_password123;TrustServerCertificate=True;";
 }
-
-builder.Services.AddScoped<MissionAPI.Interfaces.IMissionRepository, MissionAPI.Repositories.MissionRepository>();
-builder.Services.AddScoped<MissionAPI.Interfaces.INotificationRepository, MissionAPI.Repositories.NotificationRepository>();
-builder.Services.AddScoped<MissionAPI.Interfaces.IUploadRepository, MissionAPI.Repositories.UploadRepository>();
-builder.Services.AddScoped<MissionAPI.Interfaces.IUploadService, MissionAPI.Services.UploadService>();
-
-// Add MediatR for CQRS
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(MissionAPI.Application.Features.Missions.Queries.GetAllMissionsQuery).Assembly));
-
-builder.Services.AddScoped<MissionAPI.Interfaces.ICloudinaryService, MissionAPI.Services.CloudinaryService>();
-builder.Services.Configure<MissionAPI.Settings.CloudinarySettings>(options =>
-{
-    options.CloudName = Environment.GetEnvironmentVariable("Cloudinary__CloudName")
-        ?? Environment.GetEnvironmentVariable("CloudinarySettings__CloudName")
-        ?? builder.Configuration["Cloudinary:CloudName"]
-        ?? "";
-    options.ApiKey = Environment.GetEnvironmentVariable("Cloudinary__ApiKey")
-        ?? Environment.GetEnvironmentVariable("CloudinarySettings__ApiKey")
-        ?? builder.Configuration["Cloudinary:ApiKey"]
-        ?? "";
-    options.ApiSecret = Environment.GetEnvironmentVariable("Cloudinary__ApiSecret")
-        ?? Environment.GetEnvironmentVariable("CloudinarySettings__ApiSecret")
-        ?? builder.Configuration["Cloudinary:ApiSecret"]
-        ?? "";
-});
+builder.Services.AddMissionModule(builder.Configuration);
 
 builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 
@@ -102,31 +76,9 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-var chapterApiUrl = Environment.GetEnvironmentVariable("CHAPTER_API_URL")
-    ?? builder.Configuration["GrpcEndpoints:ChapterAPI"]
-    ?? "https://localhost:7114";
-builder.Services.AddGrpcClient<ChapterGrpc.ChapterGrpcClient>(o => o.Address = new Uri(chapterApiUrl));
-
-var socialApiUrl = Environment.GetEnvironmentVariable("SOCIAL_API_URL")
-    ?? builder.Configuration["GrpcEndpoints:SocialAPI"]
-    ?? "https://localhost:7133";
-builder.Services.AddGrpcClient<SocialActivity.SocialActivityClient>(o => o.Address = new Uri(socialApiUrl));
-
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetService<MissionDbContext>();
-    db?.Database.Migrate();
-    if (db != null && !db.Missions.Any())
-    {
-        db.Missions.AddRange(
-            new MissionAPI.Entities.Mission { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Title = "Đọc Truyện Chăm Chỉ", Description = "Đọc ít nhất 5 chương truyện bất kỳ.", RewardCoin = 50, Type = SharedKernel.Enums.MissionType.ReadChapter, TargetCount = 5, IsActive = true, StartDate = new DateTime(2026, 1, 1), CreatedAt = new DateTime(2026, 1, 1) },
-            new MissionAPI.Entities.Mission { Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), Title = "Mua Chapter", Description = "Mua ít nhất một chapter.", RewardCoin = 200, Type = SharedKernel.Enums.MissionType.PurchaseChapter, TargetCount = 1, IsActive = true, StartDate = new DateTime(2026, 1, 1), CreatedAt = new DateTime(2026, 1, 1) },
-            new MissionAPI.Entities.Mission { Id = Guid.Parse("33333333-3333-3333-3333-333333333333"), Title = "Nhà Phê Bình", Description = "Bình luận ít nhất 3 lần.", RewardCoin = 30, Type = SharedKernel.Enums.MissionType.LeaveComment, TargetCount = 3, IsActive = true, StartDate = new DateTime(2026, 1, 1), CreatedAt = new DateTime(2026, 1, 1) });
-        db.SaveChanges();
-    }
-}
+app.UseMissionModule();
 
 if (app.Environment.IsDevelopment())
 {
