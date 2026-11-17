@@ -29,6 +29,7 @@ if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CHAPTER_DB_CONNECTI
         "Server=localhost;Database=ChapterDB;Trusted_Connection=True;TrustServerCertificate=True;";
 }
 builder.Services.AddChapterModule(builder.Configuration);
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ChapterAPI.Application.Features.Chapters.Queries.GetChapterInfoQuery).Assembly)).AddAutoMapper(typeof(ChapterAPI.Mappings.ChapterMappingProfile).Assembly);
 
 builder.Services.AddMassTransit(x =>
 {

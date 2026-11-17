@@ -25,9 +25,6 @@ public static class PaymentModule
 
         services.AddScoped<IPaymentRepository, PaymentRepository>();
 
-        // Add MediatR for CQRS
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PaymentAPI.Application.Features.Payments.Queries.GetBalanceQuery).Assembly));
-
         // Still gRPC (replaced in T16-T18). The host does not serve gRPC (ChapterGrpcService and
         // WalletGrpcService are not mapped), so these calls fail in the host until then.
         // See "Remaining gRPC calls" in PLAN.md.

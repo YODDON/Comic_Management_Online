@@ -30,9 +30,6 @@ public static class UserModule
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IAvatarStorageService, AvatarStorageService>();
 
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(
-            typeof(UserAPI.Application.DTOs.UserProfileDto).Assembly));
-
         return services;
     }
 

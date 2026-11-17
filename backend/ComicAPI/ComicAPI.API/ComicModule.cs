@@ -25,7 +25,6 @@ public static class ComicModule
         services.Configure<ComicAPI.Infrastructure.Settings.CloudinarySettings>(configuration.GetSection("Cloudinary"));
         services.AddScoped<ComicAPI.Application.Interfaces.ICloudinaryService, ComicAPI.Infrastructure.Services.CloudinaryService>();
 
-        services.AddAutoMapper(typeof(ComicAPI.Application.Mappings.ComicProfile).Assembly);
 
         // Still gRPC (replaced in T16-T18). The host does not serve gRPC, so these calls
         // fail at runtime in the host; the handlers catch the error and use a fallback.
@@ -47,9 +46,6 @@ public static class ComicModule
 
         services.AddScoped<ComicAPI.Domain.Interfaces.ICategoryRepository, ComicAPI.Infrastructure.Repositories.CategoryRepository>();
         services.AddScoped<ComicAPI.Domain.Interfaces.IComicRepository, ComicAPI.Infrastructure.Repositories.ComicRepository>();
-
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(
-            typeof(ComicAPI.Application.Features.Comics.Queries.GetComicsQuery).Assembly));
 
         // Not registered here (no bus in the host until T20): ComicViewedEventConsumer and MassTransit.
         // Not mapped: the comic.proto server (no service implementation exists in ComicAPI.API).

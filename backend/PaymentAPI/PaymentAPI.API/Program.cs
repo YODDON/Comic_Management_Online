@@ -24,6 +24,7 @@ builder.Configuration.AddEnvironmentVariables();
 
 // Controllers, DbContext, repository, MediatR, gRPC clients, TopUp/Bank settings: see PaymentModule.cs.
 builder.Services.AddPaymentModule(builder.Configuration);
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PaymentAPI.Application.Features.Payments.Queries.GetBalanceQuery).Assembly));
 
 builder.Services.AddMassTransit(x =>
 {

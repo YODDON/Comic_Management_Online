@@ -19,9 +19,6 @@ public static class WalletModule
         services.AddScoped<IWithdrawRepository, WithdrawRepository>();
         services.AddScoped<IWalletRepository, WalletRepository>();
 
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(
-            typeof(WalletAPI.Application.Features.Currency.Queries.GetHistoryQuery).Assembly));
-
         var walletConn = Environment.GetEnvironmentVariable("WALLET_DB_CONNECTION")
             ?? configuration.GetConnectionString("WalletConnection")
             ?? configuration.GetConnectionString("DefaultConnection");

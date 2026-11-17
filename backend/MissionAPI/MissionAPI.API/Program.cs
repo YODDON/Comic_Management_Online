@@ -20,6 +20,7 @@ if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MISSION_DB_CONNECTI
         "Server=localhost,1433;Database=MissionDB;User Id=sa;Password=Your_password123;TrustServerCertificate=True;";
 }
 builder.Services.AddMissionModule(builder.Configuration);
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(MissionAPI.Application.Features.Missions.Queries.GetAllMissionsQuery).Assembly));
 
 builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 

@@ -17,9 +17,6 @@ public static class BannerModule
         services.AddScoped<IBannerRepository, BannerRepository>();
         services.AddScoped<ICloudinaryService, CloudinaryService>();
 
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(
-            typeof(BannerAPI.Application.Features.Banners.Commands.CreateBannerCommand).Assembly));
-
         var bannerConn = Environment.GetEnvironmentVariable("BANNER_DB_CONNECTION")
             ?? configuration.GetConnectionString("BannerConnection")
             ?? configuration.GetConnectionString("DefaultConnection");

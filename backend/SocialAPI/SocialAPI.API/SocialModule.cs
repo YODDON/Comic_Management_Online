@@ -46,9 +46,6 @@ public static class SocialModule
         services.AddScoped<ISocialActivityRepository, SocialActivityRepository>();
         services.AddScoped<IMissionProgressNotifier, MissionProgressNotifier>();
 
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(
-            typeof(SocialAPI.Application.Features.Comments.Commands.CreateCommentCommand).Assembly));
-
         // Not registered here: MassTransit (the host owns the single bus, see Program.cs),
         // the EF Outbox, and the gRPC server (SocialActivityGrpcService is not mapped).
 

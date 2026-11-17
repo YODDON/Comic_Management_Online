@@ -25,9 +25,6 @@ public static class MissionModule
         services.AddScoped<MissionAPI.Interfaces.IUploadRepository, MissionAPI.Repositories.UploadRepository>();
         services.AddScoped<MissionAPI.Interfaces.IUploadService, MissionAPI.Services.UploadService>();
 
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(
-            typeof(MissionAPI.Application.Features.Missions.Queries.GetAllMissionsQuery).Assembly));
-
         services.AddScoped<MissionAPI.Interfaces.ICloudinaryService, MissionAPI.Services.CloudinaryService>();
         services.Configure<MissionAPI.Settings.CloudinarySettings>(options =>
         {

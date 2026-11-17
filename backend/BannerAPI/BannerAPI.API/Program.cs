@@ -7,6 +7,7 @@ DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddBannerModule(builder.Configuration);
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(BannerAPI.Application.Features.Banners.Commands.CreateBannerCommand).Assembly));
 
 builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 

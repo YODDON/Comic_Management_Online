@@ -20,6 +20,7 @@ if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WALLET_DB_CONNECTIO
 }
 
 builder.Services.AddWalletModule(builder.Configuration);
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(WalletAPI.Application.Features.Currency.Queries.GetHistoryQuery).Assembly));
 
 builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 

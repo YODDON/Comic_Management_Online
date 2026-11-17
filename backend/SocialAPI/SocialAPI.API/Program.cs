@@ -19,6 +19,7 @@ if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SOCIAL_DB_CONNECTIO
         "Server=localhost;Database=SocialDB;Trusted_Connection=True;TrustServerCertificate=True;";
 }
 builder.Services.AddSocialModule(builder.Configuration);
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(SocialAPI.Application.Features.Comments.Commands.CreateCommentCommand).Assembly));
 
 builder.Services.AddMassTransit(x =>
 {

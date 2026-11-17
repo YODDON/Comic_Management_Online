@@ -34,12 +34,8 @@ public static class ChapterModule
             client.BaseAddress = new Uri(apiGatewayUrl + "/api");
         });
 
-        services.AddAutoMapper(typeof(ChapterAPI.Mappings.ChapterMappingProfile).Assembly);
         services.AddScoped<IChapterRepository, ChapterRepository>();
         services.AddScoped<IMissionProgressNotifier, MissionProgressNotifier>();
-
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(
-            typeof(ChapterAPI.Application.Features.Chapters.Queries.GetChapterInfoQuery).Assembly));
 
         // Not registered here: MassTransit (the host owns the single bus, see Program.cs),
         // UnlockChapterConsumer, the EF Outbox, and the gRPC server (ChapterGrpcService is not mapped).
