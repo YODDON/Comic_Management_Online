@@ -50,7 +50,7 @@ public abstract class RedeliveryScenarios
     }
 
     /// <summary>Sends the message to the queue and waits until the consumer has finished it without a fault.</summary>
-    private static async Task DeliverAsync<T>(IServiceScope consumerSide, string queue, T message, Guid messageId) where T : class
+    protected static async Task DeliverAsync<T>(IServiceScope consumerSide, string queue, T message, Guid messageId) where T : class
     {
         var bus = consumerSide.ServiceProvider.GetRequiredService<IBus>();
         var watcher = new ConsumeWatcher<T>(messageId);

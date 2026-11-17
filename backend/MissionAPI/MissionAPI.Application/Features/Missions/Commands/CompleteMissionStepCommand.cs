@@ -72,7 +72,10 @@ namespace MissionAPI.Application.Features.Missions.Commands
             userMission.UpdatedAt = DateTime.UtcNow;
             
             await _missionRepository.UpdateUserMissionAsync(userMission);
+            await _missionRepository.SaveChangesAsync();
 
+            // T44: publish only after the mission is saved as complete. If this publish throws, the mission stays
+            // complete without a reward and nothing re-sends it (see PLAN.md Open decisions).
             await _publishEndpoint.Publish(new MissionRewardGrantedEvent
             {
                 UserId = request.UserId,
@@ -81,8 +84,6 @@ namespace MissionAPI.Application.Features.Missions.Commands
                 Description = $"Mission reward: {mission.Title}",
                 OccurredAt = DateTime.UtcNow
             });
-
-            await _missionRepository.SaveChangesAsync();
 
             var dto = new UserMissionDto
             {

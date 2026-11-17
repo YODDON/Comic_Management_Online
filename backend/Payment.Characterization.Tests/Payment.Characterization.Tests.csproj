@@ -48,6 +48,9 @@
     <ProjectReference Include="..\ChapterAPI\ChapterAPI.Application\ChapterAPI.Application.csproj" />
     <ProjectReference Include="..\ChapterAPI\ChapterAPI.Infrastructure\ChapterAPI.Infrastructure.csproj" />
     <ProjectReference Include="..\ChapterAPI\ChapterAPI.API\ChapterAPI.API.csproj" Aliases="chapterserver" />
+
+    <!-- T44: the real CompleteMissionStepCommandHandler (mission reward publish order). -->
+    <ProjectReference Include="..\MissionAPI\MissionAPI.Application\MissionAPI.Application.csproj" />
   </ItemGroup>
 
 </Project>
