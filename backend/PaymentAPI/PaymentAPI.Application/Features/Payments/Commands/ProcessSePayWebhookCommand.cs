@@ -98,11 +98,30 @@ namespace PaymentAPI.Application.Features.Payments.Commands
                     // First payment for this QR code. Take over the pending transaction.
                     targetTransaction = originalTx;
                     requestedAmount = targetTransaction.Amount;
+
+                    targetTransaction.Amount = request.Request.TransferAmount;
+                    targetTransaction.Note = BuildSePayNote(request.Request, requestedAmount);
+                    targetTransaction.ExternalTransactionId = request.Request.Id.ToString();
+
+                    try
+                    {
+                        await _repository.UpdateTransactionAsync(targetTransaction);
+                    }
+                    catch (Exception ex) when (ex.GetType().Name == "DbUpdateException")
+                    {
+                        // Unique constraint violation: another webhook already claimed this Id concurrently.
+                        return new ApiResponse<bool>(true, "Webhook already processed concurrently.");
+                    }
                 }
                 else
                 {
-                    // The QR code was paid before (or already taken by another webhook).
-                    // Create a new transaction for this extra payment.
+                    // The QR code was paid before (or already taken by another webhook): this is an extra
+                    // payment with a new SePay id, credited as its own deposit. The deposit code is unique
+                    // per transaction row (IX_Transactions_TransactionCode), so the extra row is keyed
+                    // "{code}-{sePayId}"; the original row keeps the plain code and stays the one the code
+                    // lookup finds. The row is complete when inserted (note and SePay id included), so the
+                    // insert is also the claim on this SePay id: no half-claimed row is left behind.
+                    requestedAmount = request.Request.TransferAmount; // No mismatch for extra payments
                     targetTransaction = new Transaction
                     {
                         UserId = originalTx.UserId,
@@ -111,35 +130,47 @@ namespace PaymentAPI.Application.Features.Payments.Commands
                         CurrencyType = "VND",
                         Status = TransactionStatus.Pending,
                         PaymentMethod = "VIETQR",
-                        TransactionCode = transactionCode,
+                        TransactionCode = $"{transactionCode}-{request.Request.Id}",
+                        Note = BuildSePayNote(request.Request, requestedAmount),
+                        ExternalTransactionId = request.Request.Id.ToString(),
                         CreatedAt = DateTime.UtcNow
                     };
-                    await _repository.AddTransactionAsync(targetTransaction);
-                    requestedAmount = request.Request.TransferAmount; // No mismatch for extra payments
-                }
 
-                targetTransaction.Amount = request.Request.TransferAmount;
-                targetTransaction.Note = BuildSePayNote(request.Request, requestedAmount);
-                targetTransaction.ExternalTransactionId = request.Request.Id.ToString();
-                
-                try
-                {
-                    await _repository.UpdateTransactionAsync(targetTransaction);
-                }
-                catch (Exception ex) when (ex.GetType().Name == "DbUpdateException")
-                {
-                    // Unique constraint violation: another webhook already claimed this Id concurrently.
-                    return new ApiResponse<bool>(true, "Webhook already processed concurrently.");
+                    try
+                    {
+                        await _repository.AddTransactionAsync(targetTransaction);
+                    }
+                    catch (Exception ex) when (ex.GetType().Name == "DbUpdateException")
+                    {
+                        // A concurrent delivery of the same SePay id claimed it first (unique SePay id / code).
+                        // If a row for this id exists, it is recorded: answer success. If none exists, nothing
+                        // was recorded and the failure is real: let it escape (HTTP 500) so SePay retries.
+                        if (await _repository.GetTransactionByNotePrefixAsync($"SEPAY id={request.Request.Id};") != null)
+                        {
+                            return new ApiResponse<bool>(true, "Webhook already processed concurrently.");
+                        }
+
+                        throw;
+                    }
                 }
             }
 
-            if (!await CreditWalletForTopUpAsync(targetTransaction))
+            // From here the transfer is recorded. Any failure must answer 503 (never an unhandled 500): the row
+            // stays Pending and SePay's retry credits it once (the wallet deduplicates on the transaction id).
+            try
             {
-                return ApiResponse<bool>.ErrorResponse("Could not credit the wallet. Transaction stays pending; retry later.", 503);
-            }
+                if (!await CreditWalletForTopUpAsync(targetTransaction))
+                {
+                    return ApiResponse<bool>.ErrorResponse("Could not credit the wallet. Transaction stays pending; retry later.", 503);
+                }
 
-            targetTransaction.Status = TransactionStatus.Completed;
-            await _repository.UpdateTransactionAsync(targetTransaction);
+                targetTransaction.Status = TransactionStatus.Completed;
+                await _repository.UpdateTransactionAsync(targetTransaction);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return ApiResponse<bool>.ErrorResponse("Could not complete the top-up. Transaction stays pending; retry later.", 503);
+            }
 
             return new ApiResponse<bool>(true, "Topup transaction completed via SePay Webhook.");
         }

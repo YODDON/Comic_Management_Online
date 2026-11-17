@@ -2,6 +2,7 @@ using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using PaymentAPI.DTOs;
@@ -132,8 +133,14 @@ namespace PaymentAPI.Controllers
 
             var response = await _mediator.Send(new ProcessSePayWebhookCommand { Request = request });
 
-            // Always HTTP 200 once authenticated: SePay reads our verdict from the body, and a non-200
-            // looks like a delivery failure that triggers pointless retries of a call we already judged.
+            // The transfer is recorded but the wallet was not credited: answer a real HTTP 503 so SePay
+            // retries (it retries only outside 200-299). Every other verdict stays HTTP 200 with the
+            // verdict in the body, so SePay does not retry calls we already judged.
+            if (response.StatusCode == StatusCodes.Status503ServiceUnavailable)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, response);
+            }
+
             return Ok(response);
         }
 
