@@ -94,6 +94,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Replaces the YARP gateway's path transforms (/comics -> /api/comics ...). Must run before UseRouting.
+app.UsePathRewrite();
+
 app.UseRouting();
 app.UseCors("Frontend");
 
