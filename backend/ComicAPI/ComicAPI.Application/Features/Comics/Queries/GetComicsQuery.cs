@@ -9,7 +9,7 @@ using ComicAPI.Domain.Interfaces;
 using MediatR;
 using SharedKernel.Enums;
 using SharedKernel.Responses;
-using UserAPI.Protos;
+using SharedKernel.Contracts.Modules;
 
 namespace ComicAPI.Application.Features.Comics.Queries
 {
@@ -26,13 +26,13 @@ namespace ComicAPI.Application.Features.Comics.Queries
     {
         private readonly IComicRepository _comicRepository;
         private readonly IMapper _mapper;
-        private readonly UserService.UserServiceClient _userServiceClient;
+        private readonly IComicUserLookup _userLookup;
 
-        public GetComicsQueryHandler(IComicRepository comicRepository, IMapper mapper, UserService.UserServiceClient userServiceClient)
+        public GetComicsQueryHandler(IComicRepository comicRepository, IMapper mapper, IComicUserLookup userLookup)
         {
             _comicRepository = comicRepository;
             _mapper = mapper;
-            _userServiceClient = userServiceClient;
+            _userLookup = userLookup;
         }
 
         public async Task<ApiResponse<PagedResult<ComicSummaryDto>>> Handle(GetComicsQuery request, CancellationToken cancellationToken)
@@ -43,7 +43,7 @@ namespace ComicAPI.Application.Features.Comics.Queries
             var (items, totalCount) = await _comicRepository.GetComicsAsync(pageNumber, pageSize, request.Search, request.CategoryIds, request.Status);
 
             var dtos = _mapper.Map<List<ComicSummaryDto>>(items);
-            await ComicHelper.EnrichComicsWithAuthorNamesAsync(_userServiceClient, dtos, items);
+            await ComicHelper.EnrichComicsWithAuthorNamesAsync(_userLookup, dtos, items);
             await ComicHelper.EnrichOutstandingFlagsAsync(_comicRepository, dtos);
 
             var pagedResult = new PagedResult<ComicSummaryDto>(dtos, totalCount, pageNumber, pageSize);

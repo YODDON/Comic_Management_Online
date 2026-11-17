@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using ComicAPI.Application.DTOs;
 using ComicAPI.Domain.Entities;
 using ComicAPI.Domain.Interfaces;
-using UserAPI.Protos;
+using SharedKernel.Contracts.Modules;
 
 namespace ComicAPI.Application.Features.Comics.Helpers
 {
@@ -19,7 +19,7 @@ namespace ComicAPI.Application.Features.Comics.Helpers
             }
         }
 
-        public static async Task EnrichComicsWithAuthorNamesAsync(UserService.UserServiceClient userServiceClient, List<ComicSummaryDto> dtos, List<Comic> comics)
+        public static async Task EnrichComicsWithAuthorNamesAsync(IComicUserLookup userLookup, List<ComicSummaryDto> dtos, List<Comic> comics)
         {
             var comicsWithoutAuthor = comics
                 .Where(comic => string.IsNullOrWhiteSpace(comic.Author))
@@ -34,22 +34,19 @@ namespace ComicAPI.Application.Features.Comics.Helpers
                 }
             }
 
-            var ownerIds = comicsWithoutAuthor.Select(i => i.OwnerId.ToString()).Distinct().ToList();
+            var ownerIds = comicsWithoutAuthor.Select(i => i.OwnerId).Distinct().ToList();
             if (!ownerIds.Any()) return;
 
             try
             {
-                var request = new GetUsersByIdsRequest();
-                request.Ids.AddRange(ownerIds);
-
-                var response = await userServiceClient.GetUsersByIdsAsync(request);
-                var userDict = response.Users.ToDictionary(u => u.Id, u => u.Username);
+                var users = await userLookup.GetUsersByIdsAsync(ownerIds);
+                var userDict = users.ToDictionary(u => u.Id, u => u.Username);
 
                 foreach (var dto in dtos)
                 {
                     var originalComic = comics.First(c => c.Id == dto.Id);
                     if (!string.IsNullOrWhiteSpace(originalComic.Author)) continue;
-                    if (userDict.TryGetValue(originalComic.OwnerId.ToString(), out var username))
+                    if (userDict.TryGetValue(originalComic.OwnerId, out var username))
                     {
                         dto.AuthorName = username;
                     }

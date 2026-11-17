@@ -2,7 +2,7 @@ namespace SharedKernel.Contracts.Modules;
 
 /// <summary>
 /// Call direction ComicAPI to UserAPI. Replaces the gRPC call <c>UserService.GetUsersByIds</c> (T15, T16).
-/// Declaration only: nothing implements or uses it before T17.
+/// Implemented by UserAPI (<c>ComicUserLookup</c>), used by the ComicAPI handlers (T17). Failures surface as <see cref="ModuleCallException"/>.
 /// </summary>
 public interface IComicUserLookup
 {

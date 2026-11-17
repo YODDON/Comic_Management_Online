@@ -10,7 +10,7 @@ using ComicAPI.Domain.Interfaces;
 using MediatR;
 using SharedKernel.Enums;
 using SharedKernel.Responses;
-using UserAPI.Protos;
+using SharedKernel.Contracts.Modules;
 
 namespace ComicAPI.Application.Features.Comics.Commands
 {
@@ -23,13 +23,13 @@ namespace ComicAPI.Application.Features.Comics.Commands
     {
         private readonly IComicRepository _comicRepository;
         private readonly IMapper _mapper;
-        private readonly UserService.UserServiceClient _userServiceClient;
+        private readonly IComicUserLookup _userLookup;
 
-        public AddOutstandingComicCommandHandler(IComicRepository comicRepository, IMapper mapper, UserService.UserServiceClient userServiceClient)
+        public AddOutstandingComicCommandHandler(IComicRepository comicRepository, IMapper mapper, IComicUserLookup userLookup)
         {
             _comicRepository = comicRepository;
             _mapper = mapper;
-            _userServiceClient = userServiceClient;
+            _userLookup = userLookup;
         }
 
         public async Task<ApiResponse<ComicDetailDto>> Handle(AddOutstandingComicCommand request, CancellationToken cancellationToken)
@@ -65,7 +65,7 @@ namespace ComicAPI.Application.Features.Comics.Commands
             var dto = _mapper.Map<ComicDetailDto>(comic);
             dto.IsOutstanding = true;
             var summary = _mapper.Map<ComicSummaryDto>(comic);
-            await ComicHelper.EnrichComicsWithAuthorNamesAsync(_userServiceClient, new List<ComicSummaryDto> { summary }, new List<Comic> { comic });
+            await ComicHelper.EnrichComicsWithAuthorNamesAsync(_userLookup, new List<ComicSummaryDto> { summary }, new List<Comic> { comic });
             dto.AuthorName = summary.AuthorName;
 
             return new ApiResponse<ComicDetailDto>(dto, "Comic added to outstandings.", 201);

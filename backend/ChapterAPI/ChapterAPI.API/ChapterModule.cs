@@ -37,6 +37,9 @@ public static class ChapterModule
         services.AddScoped<IChapterRepository, ChapterRepository>();
         services.AddScoped<IMissionProgressNotifier, MissionProgressNotifier>();
 
+        // In-process replacement for the gRPC calls ComicAPI -> ChapterAPI (T17).
+        services.AddScoped<SharedKernel.Contracts.Modules.IComicChapterLookup, ChapterAPI.ModuleServices.ComicChapterLookup>();
+
         // Not registered here: MassTransit (the host owns the single bus, see Program.cs),
         // UnlockChapterConsumer, the EF Outbox, and the gRPC server (ChapterGrpcService is not mapped).
 

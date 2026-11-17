@@ -2,7 +2,7 @@ namespace SharedKernel.Contracts.Modules;
 
 /// <summary>
 /// Call direction ComicAPI to ChapterAPI. Replaces the gRPC calls <c>ChapterGrpc.GetChapterCount</c> and
-/// <c>ChapterGrpc.GetPurchasedComicIds</c> (T15, T16). Declaration only: nothing implements or uses it before T17.
+/// <c>ChapterGrpc.GetPurchasedComicIds</c> (T15, T16). Implemented by ChapterAPI (<c>ComicChapterLookup</c>), used by the ComicAPI handlers (T17). Failures surface as <see cref="ModuleCallException"/>.
 /// </summary>
 public interface IComicChapterLookup
 {
