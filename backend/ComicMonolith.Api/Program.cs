@@ -3,6 +3,7 @@ using ChapterAPI;
 using ComicAPI.API;
 using MassTransit;
 using SharedKernel.Extensions;
+using SocialAPI;
 using UserAPI.API;
 using WalletAPI;
 
@@ -18,6 +19,7 @@ builder.Services.AddControllers();
 builder.Services.AddBannerModule(builder.Configuration);
 builder.Services.AddChapterModule(builder.Configuration);
 builder.Services.AddComicModule(builder.Configuration);
+builder.Services.AddSocialModule(builder.Configuration);
 builder.Services.AddUserModule(builder.Configuration);
 builder.Services.AddWalletModule(builder.Configuration);
 
@@ -49,6 +51,7 @@ var app = builder.Build();
 app.UseBannerModule();
 app.UseChapterModule();
 app.UseComicModule();
+app.UseSocialModule();
 app.UseUserModule();
 app.UseWalletModule();
 

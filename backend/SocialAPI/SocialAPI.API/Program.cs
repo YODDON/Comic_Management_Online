@@ -1,8 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-using SocialAPI.Data;
-using SocialAPI.Interfaces;
-using SocialAPI.Repositories;
-using SocialAPI.Services;
+using SocialAPI;
 using SharedKernel.Extensions;
 using MissionAPI.Protos;
 using MassTransit;
@@ -12,38 +8,17 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-builder.Services.AddControllers();
 builder.Services.AddGrpc();
 
-var socialConn = Environment.GetEnvironmentVariable("SOCIAL_DB_CONNECTION") ?? builder.Configuration.GetConnectionString("SocialConnection");
-if (string.IsNullOrEmpty(socialConn))
+// Controllers, DbContext, ComicValidator, repositories, MediatR: see SocialModule.cs.
+// Note: the module has no localhost connection fallback; the standalone API keeps it below.
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SOCIAL_DB_CONNECTION"))
+    && string.IsNullOrEmpty(builder.Configuration.GetConnectionString("SocialConnection")))
 {
-    socialConn = "Server=localhost;Database=SocialDB;Trusted_Connection=True;TrustServerCertificate=True;";
+    builder.Configuration["ConnectionStrings:SocialConnection"] =
+        "Server=localhost;Database=SocialDB;Trusted_Connection=True;TrustServerCertificate=True;";
 }
-builder.Services.AddDbContext<SocialDbContext>(options => options.UseSqlServer(socialConn));
-
-builder.Services.AddHttpClient<IComicValidator, ComicValidator>(client =>
-{
-    var apiGatewayUrl = Environment.GetEnvironmentVariable("API_GATEWAY_URL");
-    if (string.IsNullOrWhiteSpace(apiGatewayUrl))
-    {
-        apiGatewayUrl = builder.Configuration["ApiGateway:BaseUrl"];
-    }
-    if (string.IsNullOrWhiteSpace(apiGatewayUrl))
-    {
-        apiGatewayUrl = "http://127.0.0.1:5028";
-    }
-
-    client.BaseAddress = new Uri(apiGatewayUrl);
-});
-builder.Services.AddScoped<ICommentRepository, CommentRepository>();
-builder.Services.AddScoped<IFavoriteRepository, FavoriteRepository>();
-builder.Services.AddScoped<IFollowRepository, FollowRepository>();
-builder.Services.AddScoped<IReadingHistoryRepository, ReadingHistoryRepository>();
-builder.Services.AddScoped<ISocialActivityRepository, SocialActivityRepository>();
-
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(SocialAPI.Application.Features.Comments.Commands.CreateCommentCommand).Assembly));
-builder.Services.AddScoped<IMissionProgressNotifier, MissionProgressNotifier>();
+builder.Services.AddSocialModule(builder.Configuration);
 
 builder.Services.AddMassTransit(x =>
 {
@@ -70,11 +45,7 @@ builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetService<SocialDbContext>();
-    db?.Database.Migrate();
-}
+app.UseSocialModule();
 
 if (app.Environment.IsDevelopment())
 {
