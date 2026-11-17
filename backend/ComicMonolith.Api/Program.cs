@@ -1,6 +1,7 @@
 using BannerAPI;
 using ChapterAPI;
 using ComicAPI.API;
+using ComicMonolith.Api;
 using MassTransit;
 using MissionAPI;
 using PaymentAPI;
@@ -14,6 +15,11 @@ DotNetEnv.Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables();
+
+// Fail fast before any module is registered (T12). Both run in every environment; the JWT check only
+// throws outside Development (an unset ASPNETCORE_ENVIRONMENT counts as Production).
+StartupChecks.ValidateConnectionStrings(builder.Configuration);
+var jwtSecretWarning = StartupChecks.EnforceJwtSecret(builder.Configuration, builder.Environment);
 
 builder.Services.AddControllers();
 
@@ -67,6 +73,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+if (jwtSecretWarning is not null)
+{
+    app.Logger.LogWarning("{Message}", jwtSecretWarning);
+}
 
 app.UseBannerModule();
 app.UseChapterModule();
