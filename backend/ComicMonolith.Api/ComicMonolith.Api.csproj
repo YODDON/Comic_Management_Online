@@ -18,6 +18,7 @@
     <ProjectReference Include="..\ChapterAPI\ChapterAPI.API\ChapterAPI.API.csproj" />
     <ProjectReference Include="..\ComicAPI\ComicAPI.API\ComicAPI.API.csproj" />
     <ProjectReference Include="..\MissionAPI\MissionAPI.API\MissionAPI.API.csproj" />
+    <ProjectReference Include="..\PaymentAPI\PaymentAPI.API\PaymentAPI.API.csproj" />
     <ProjectReference Include="..\SocialAPI\SocialAPI.API\SocialAPI.API.csproj" />
     <ProjectReference Include="..\UserAPI\UserAPI.API\UserAPI.API.csproj" />
     <ProjectReference Include="..\WalletAPI\WalletAPI.API\WalletAPI.API.csproj" />
