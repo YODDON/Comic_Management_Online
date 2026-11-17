@@ -45,7 +45,7 @@ public static class ChapterModule
         services.AddScoped<SharedKernel.Contracts.Modules.IPaymentChapterGateway, ChapterAPI.ModuleServices.PaymentChapterGateway>();
 
         // Not registered here: MassTransit (the host owns the single bus, see Program.cs),
-        // UnlockChapterConsumer, the EF Outbox, and the gRPC server (ChapterGrpcService is not mapped).
+        // UnlockChapterConsumer and the EF Outbox.
 
         return services;
     }

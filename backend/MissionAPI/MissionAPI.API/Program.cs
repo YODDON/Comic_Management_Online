@@ -9,9 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-builder.Services.AddGrpc();
-
-// Controllers, DbContext, repositories, upload/Cloudinary, MediatR, gRPC clients: see MissionModule.cs.
+// Controllers, DbContext, repositories, upload/Cloudinary, MediatR: see MissionModule.cs.
 // Note: the module has no localhost connection fallback; the standalone API keeps it below.
 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MISSION_DB_CONNECTION"))
     && string.IsNullOrEmpty(builder.Configuration.GetConnectionString("MissionConnection")))
@@ -92,7 +90,6 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGrpcService<MissionAPI.GrpcServices.MissionProgressGrpcService>();
 app.MapControllers();
 
 app.Run();

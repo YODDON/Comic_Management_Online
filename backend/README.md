@@ -1,6 +1,6 @@
 # Comic Management - Nền tảng Đọc Truyện Tranh (Backend)
 
-Backend microservices viết bằng .NET (REST API + gRPC nội bộ), điều phối qua một
+Backend microservices viết bằng .NET (REST API), điều phối qua một
 API Gateway (YARP), dùng SQL Server (mỗi service một database riêng), Redis
 và RabbitMQ.
 
@@ -23,14 +23,14 @@ Xem tổng quan toàn hệ thống ở [README gốc](../README.md).
 | `BannerAPI` | Banner trang chủ | 5127 | 7053 |
 | `SharedKernel` | Thư viện dùng chung (`ApiResponse`, `PagedResult`, `BaseEntity`, ...) | - | - |
 
-Các service gọi nhau qua gRPC nội bộ (ví dụ `ComicAPI → UserAPI`,
-`ChapterAPI → ComicAPI`, `MissionAPI → ChapterAPI/SocialAPI/WalletAPI`,
-`PaymentAPI → ChapterAPI/WalletAPI`). URL đích lấy theo thứ tự ưu tiên:
-biến môi trường (`USER_API_URL`, `COMIC_API_URL`, `CHAPTER_API_URL`,
-`MISSION_API_URL`, `SOCIAL_API_URL`, `WALLET_API_URL`) → cấu hình
-`GrpcEndpoints`/`GrpcSettings` trong `appsettings.json` → giá trị mặc định
-`localhost` kèm port ở bảng trên. Khi chạy tất cả service trên cùng máy, bạn
-**không bắt buộc** phải set các biến này.
+Các module gọi nhau trong cùng process qua interface trong
+`SharedKernel/Contracts/Modules` (`ComicAPI → UserAPI/ChapterAPI`,
+`MissionAPI → ChapterAPI/SocialAPI`, `PaymentAPI → ChapterAPI/WalletAPI`), nên
+`ComicAPI`, `MissionAPI` và `PaymentAPI` chỉ chạy đủ chức năng khi được nạp
+chung trong host `ComicMonolith.Api`. gRPC, các file `.proto`, cấu hình
+`GrpcEndpoints` và các biến `*_API_URL` đã được gỡ bỏ. Riêng `ChapterAPI` và
+`SocialAPI` vẫn kiểm tra truyện bằng HTTP `GET /comics/{id}` qua biến
+`API_GATEWAY_URL` (xem `.env.example`).
 
 `ApiGateway` định tuyến theo path (`/auth`, `/comics`, `/chapters`,
 `/comments`, `/favorites`, `/follows`, `/reading-history`, `/payments`,
@@ -60,9 +60,6 @@ biến môi trường (`USER_API_URL`, `COMIC_API_URL`, `CHAPTER_API_URL`,
    `BANNER_DB_CONNECTION`, `MISSION_DB_CONNECTION`, `SOCIAL_DB_CONNECTION`,
    `PAYMENT_DB_CONNECTION`, `WALLET_DB_CONNECTION`) — mô hình **database
    riêng theo từng service**, không dùng chung một DB.
-4. `.env.example` không có sẵn dòng cho `MISSION_API_URL`/`SOCIAL_API_URL` —
-   không sao, hai biến này chỉ cần set khi các service đó chạy ở máy/host
-   khác; nếu chạy tất cả trên cùng máy thì bỏ qua (xem fallback ở mục 1).
 
 ## 4. Khởi động hạ tầng với Docker Compose
 
@@ -82,8 +79,7 @@ Kiểm tra trạng thái container: `docker ps`.
 ### Cách 1: Visual Studio
 1. Mở `prn232_comic_api.sln`.
 2. Chọn **Multiple Startup Projects** để chạy cùng lúc `ApiGateway` và các
-   `*API` cần thiết (khuyên dùng launch profile `https` vì gRPC nội bộ cần
-   cổng HTTPS).
+   `*API` cần thiết.
 3. Nhấn `F5`/`Ctrl+F5`.
 
 ### Cách 2: .NET CLI (mở một terminal cho mỗi service)

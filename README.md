@@ -1,7 +1,7 @@
 # Comic Management
 
-Nền tảng đọc truyện tranh — full-stack: backend microservices .NET (REST +
-gRPC nội bộ, YARP API Gateway) và frontend React/Vite. Repo này là monorepo,
+Nền tảng đọc truyện tranh — full-stack: backend microservices .NET (REST,
+YARP API Gateway) và frontend React/Vite. Repo này là monorepo,
 gộp 2 phần vào cùng một chỗ để xem toàn bộ hệ thống trong một lần clone.
 
 ```
@@ -18,8 +18,8 @@ Comic_Management/
   từng microservice phía sau.
 - **8 microservice** (`UserAPI`, `ComicAPI`, `ChapterAPI`, `SocialAPI`,
   `MissionAPI`, `PaymentAPI`, `WalletAPI`, `BannerAPI`) — mỗi service có
-  database SQL Server riêng (mô hình database-per-service), gọi nhau qua
-  gRPC nội bộ khi cần.
+  database SQL Server riêng (mô hình database-per-service), gọi nhau
+  trong cùng process qua interface trong `SharedKernel/Contracts/Modules`.
 - **Hạ tầng dùng chung**: Redis, RabbitMQ.
 
 ## Bắt đầu nhanh
@@ -35,7 +35,7 @@ Comic_Management/
 
 | Phần | Công nghệ |
 |---|---|
-| Backend | .NET 9, ASP.NET Core, EF Core, gRPC, YARP, AutoMapper |
+| Backend | .NET 9, ASP.NET Core, EF Core, YARP, AutoMapper |
 | Frontend | React, React Router, Vite |
 | Data/Infra | SQL Server, Redis, RabbitMQ, Docker Compose |
 | Tích hợp | Cloudinary (ảnh), SePay/VietQR (thanh toán), Gmail SMTP, Google OAuth |

@@ -9,7 +9,6 @@ using System.Text;
 using ChapterAPI.Interfaces;
 using ChapterAPI.Repositories;
 using ChapterAPI.Services;
-using MissionAPI.Protos;
 using MassTransit;
 using ChapterAPI.Application.Consumers;
 
@@ -17,8 +16,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
-
-builder.Services.AddGrpc();
 
 // Controllers, DbContext, Cloudinary, repositories, AutoMapper, MediatR: see ChapterModule.cs.
 // Note: the module has no localhost connection fallback; the standalone API keeps it below.
@@ -64,8 +61,6 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 app.UseChapterModule();
-
-app.MapGrpcService<ChapterAPI.GrpcServices.ChapterGrpcService>();
 
 if (app.Environment.IsDevelopment())
 {

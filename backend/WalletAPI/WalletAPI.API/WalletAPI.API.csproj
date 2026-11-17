@@ -8,7 +8,6 @@
 
 	<ItemGroup>
 		<PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
-		<PackageReference Include="Grpc.AspNetCore" Version="2.80.0" />
 		<PackageReference Include="MassTransit" Version="8.3.0" />
 		<PackageReference Include="MassTransit.EntityFrameworkCore" Version="8.3.0" />
 		<PackageReference Include="MassTransit.RabbitMQ" Version="8.3.0" />
@@ -23,10 +22,6 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.8" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Protobuf Include="Protos\wallet.proto" GrpcServices="Server" />
 	</ItemGroup>
 
 	<ItemGroup>

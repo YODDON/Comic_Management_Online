@@ -1,14 +1,11 @@
 using SocialAPI;
 using SharedKernel.Extensions;
-using MissionAPI.Protos;
 using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
-
-builder.Services.AddGrpc();
 
 // Controllers, DbContext, ComicValidator, repositories, MediatR: see SocialModule.cs.
 // Note: the module has no localhost connection fallback; the standalone API keeps it below.
@@ -59,7 +56,6 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGrpcService<SocialAPI.GrpcServices.SocialActivityGrpcService>();
 app.MapControllers();
 
 app.Run();

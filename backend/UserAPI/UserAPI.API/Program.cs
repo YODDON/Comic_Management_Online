@@ -12,9 +12,6 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(UserA
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddGrpc();
-builder.Services.AddGrpcReflection();
-
 builder.Services.AddCustomJwtAuthentication(builder.Configuration);
 
 var app = builder.Build();
@@ -32,11 +29,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapGrpcService<UserAPI.API.GrpcServices.UserGrpcService>();
-
-if (app.Environment.IsDevelopment())
-{
-    app.MapGrpcReflectionService();
-}
 
 app.Run();

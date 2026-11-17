@@ -50,7 +50,7 @@ public static class SocialModule
         services.AddScoped<SharedKernel.Contracts.Modules.IMissionSocialActivity, SocialAPI.API.ModuleServices.MissionSocialActivity>();
 
         // Not registered here: MassTransit (the host owns the single bus, see Program.cs),
-        // the EF Outbox, and the gRPC server (SocialActivityGrpcService is not mapped).
+        // and the EF Outbox.
 
         return services;
     }

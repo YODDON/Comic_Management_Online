@@ -1,8 +1,6 @@
-using ChapterAPI.Protos;
 using Microsoft.EntityFrameworkCore;
 using MissionAPI.Controllers;
 using MissionAPI.Data;
-using SocialAPI.Protos;
 
 namespace MissionAPI;
 
@@ -42,24 +40,11 @@ public static class MissionModule
                 ?? "";
         });
 
-        // The two gRPC clients below are no longer used: SyncCommand calls IMissionChapterActivity and
-        // IMissionSocialActivity in-process (T17 group 2). T18 deletes the clients.
-        // See "Remaining gRPC calls" in PLAN.md.
-        var chapterApiUrl = Environment.GetEnvironmentVariable("CHAPTER_API_URL")
-            ?? configuration["GrpcEndpoints:ChapterAPI"]
-            ?? "https://localhost:7114";
-        // Explicit client name: the default name is the type name without namespace ("ChapterGrpcClient"),
-        // which clashes with ComicAPI's own generated ChapterGrpcClient once both modules are in the same host.
-        services.AddGrpcClient<ChapterGrpc.ChapterGrpcClient>("MissionAPI.ChapterGrpcClient", o => o.Address = new Uri(chapterApiUrl));
-
-        var socialApiUrl = Environment.GetEnvironmentVariable("SOCIAL_API_URL")
-            ?? configuration["GrpcEndpoints:SocialAPI"]
-            ?? "https://localhost:7133";
-        services.AddGrpcClient<SocialActivity.SocialActivityClient>(o => o.Address = new Uri(socialApiUrl));
+        // SyncCommand calls IMissionChapterActivity and IMissionSocialActivity in-process (T17 group 2);
+        // they are registered by AddChapterModule and AddSocialModule.
 
         // Not registered here: MassTransit, the EF Outbox and MissionActivityRecordedConsumer
-        // (the host owns the single bus; the consumer does not run in the host until T20),
-        // and the gRPC server (MissionProgressGrpcService is not mapped).
+        // (the host owns the single bus; the consumer does not run in the host until T20).
 
         return services;
     }

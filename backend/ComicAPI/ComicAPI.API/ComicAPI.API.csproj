@@ -8,11 +8,6 @@
 
 	<ItemGroup>
 		<PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
-		<PackageReference Include="Grpc.AspNetCore" Version="2.80.0" />
-		<PackageReference Include="Grpc.Tools" Version="2.80.0">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
 		<PackageReference Include="MassTransit" Version="8.3.0" />
 		<PackageReference Include="MassTransit.RabbitMQ" Version="8.3.0" />
 		<PackageReference Include="MediatR" Version="12.2.0" />
@@ -27,10 +22,6 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.8" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Protobuf Include="Protos\comic.proto" GrpcServices="Server" />
 	</ItemGroup>
 
 	<ItemGroup>
