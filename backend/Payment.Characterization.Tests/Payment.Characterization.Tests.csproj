@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    T37: characterization tests for deposit, SePay webhook, chapter purchase and the PurchaseStateMachine saga.
+    They run the CURRENT production code (real handlers, real consumers, real saga, real EF repositories on
+    SQL Server LocalDB) and pin what it does today. No production code is changed or copied.
+    Named *.Characterization.Tests on purpose: backend/.gitignore ignores "PaymentAPI.Tests/" (old projects).
+    Packages: the same test packages as ComicMonolith.Api.Tests, plus MassTransit.RabbitMQ 8.3.0 (the version
+    already used by the APIs) for the RabbitMQ runs (skipped when no broker answers on T37_RABBITMQ_HOST:5672).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SharedKernel\SharedKernel.csproj" />
+
+    <ProjectReference Include="..\PaymentAPI\PaymentAPI.Application\PaymentAPI.Application.csproj" />
+    <ProjectReference Include="..\PaymentAPI\PaymentAPI.Infrastructure\PaymentAPI.Infrastructure.csproj" />
+    <ProjectReference Include="..\PaymentAPI\PaymentAPI.API\PaymentAPI.API.csproj" />
+
+    <ProjectReference Include="..\WalletAPI\WalletAPI.Application\WalletAPI.Application.csproj" />
+    <ProjectReference Include="..\WalletAPI\WalletAPI.Infrastructure\WalletAPI.Infrastructure.csproj" />
+    <!-- The server side of wallet.proto / chapter.proto generates the same message types as the client side
+         inside PaymentAPI.Application, so the two API assemblies are aliased to avoid CS0433. -->
+    <ProjectReference Include="..\WalletAPI\WalletAPI.API\WalletAPI.API.csproj" Aliases="walletserver" />
+
+    <ProjectReference Include="..\ChapterAPI\ChapterAPI.Application\ChapterAPI.Application.csproj" />
+    <ProjectReference Include="..\ChapterAPI\ChapterAPI.Infrastructure\ChapterAPI.Infrastructure.csproj" />
+    <ProjectReference Include="..\ChapterAPI\ChapterAPI.API\ChapterAPI.API.csproj" Aliases="chapterserver" />
+  </ItemGroup>
+
+</Project>
