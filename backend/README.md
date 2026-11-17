@@ -1,8 +1,8 @@
 # Comic Management - Nền tảng Đọc Truyện Tranh (Backend)
 
 Backend microservices viết bằng .NET (REST API), điều phối qua một
-API Gateway (YARP), dùng SQL Server (mỗi service một database riêng), Redis
-và RabbitMQ.
+API Gateway (YARP), dùng SQL Server (mỗi service một database riêng) và Redis. MassTransit chạy
+in-memory trong process (không cần RabbitMQ, từ T21).
 
 Đây là thư mục `backend/` trong monorepo — frontend (React/Vite) nằm ở thư mục
 `frontend/` cùng cấp, xem [`../frontend/README.md`](../frontend/README.md).
@@ -53,8 +53,6 @@ chung trong host `ComicMonolith.Api`. gRPC, các file `.proto`, cấu hình
    - SQL Server: user `sa`, password lấy từ `SQL_SA_PASSWORD` (mặc định
      `huy492004` nếu không set — **nên đặt password riêng khi không chỉ chạy
      local**).
-   - RabbitMQ: user/pass lấy từ `RABBITMQ_USER`/`RABBITMQ_PASS` (mặc định
-     `guest`/`guest`).
 3. Mỗi service đọc connection string DB riêng của nó
    (`AUTH_DB_CONNECTION`, `COMIC_DB_CONNECTION`, `CHAPTER_DB_CONNECTION`,
    `BANNER_DB_CONNECTION`, `MISSION_DB_CONNECTION`, `SOCIAL_DB_CONNECTION`,
@@ -69,7 +67,6 @@ docker-compose up -d
 
 Lệnh này tải và chạy các container:
 - **SQL Server 2022** — port `1433`
-- **RabbitMQ** — port `5672` (AMQP) và `15672` (management UI)
 
 Kiểm tra trạng thái container: `docker ps`.
 

@@ -51,7 +51,8 @@ builder.Services.AddAutoMapper(
 
 // The single bus for all modules (T20). Modules must not call AddMassTransit themselves; each one exposes
 // AddXxxConsumers / ConfigureXxxEndpoints with the same consumers, saga and queue names as its old Program.cs.
-// Still RabbitMQ (T21 switches to in-memory). No EF Outbox: one bus cannot carry the 5 modules' bus outboxes,
+// In-memory transport since T21 (no broker): messages in flight are lost on a crash or restart; saga state stays
+// in PaymentDbContext. No EF Outbox: one bus cannot carry the 5 modules' bus outboxes,
 // and T22 decides whether it comes back. Banner, Social and User have no consumers.
 builder.Services.AddMassTransit(x =>
 {
@@ -61,15 +62,8 @@ builder.Services.AddMassTransit(x =>
     x.AddPaymentConsumers();
     x.AddWalletConsumers();
 
-    x.UsingRabbitMq((context, cfg) =>
+    x.UsingInMemory((context, cfg) =>
     {
-        var rabbitmqHost = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? builder.Configuration["RabbitMQ:Host"] ?? "localhost";
-        cfg.Host(rabbitmqHost, "/", h =>
-        {
-            h.Username("guest");
-            h.Password("guest");
-        });
-
         cfg.ConfigureChapterEndpoints(context);
         cfg.ConfigureComicEndpoints(context);
         cfg.ConfigureMissionEndpoints(context);
@@ -78,7 +72,7 @@ builder.Services.AddMassTransit(x =>
     });
 });
 // Host start waits until the bus and its queue bindings are ready, so the first messages after start are not
-// dropped as unroutable (found by T39). Start blocks while RabbitMQ is unreachable.
+// dropped as unroutable (found by T39). Kept with the in-memory transport (T21).
 builder.Services.Configure<MassTransitHostOptions>(o => o.WaitUntilStarted = true);
 
 builder.Services.AddCustomJwtAuthentication(builder.Configuration);

@@ -32,14 +32,8 @@ builder.Services.AddMassTransit(x =>
 
     x.AddConsumer<MissionActivityRecordedConsumer>();
 
-    x.UsingRabbitMq((context, cfg) =>
+    x.UsingInMemory((context, cfg) =>
     {
-        var rabbitmqHost = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? builder.Configuration["RabbitMQ:Host"] ?? "localhost";
-        cfg.Host(rabbitmqHost, "/", h => {
-            h.Username("guest");
-            h.Password("guest");
-        });
-
         cfg.ReceiveEndpoint("mission-activity-recorded", e =>
         {
             e.ConfigureConsumer<MissionActivityRecordedConsumer>(context);
