@@ -19,6 +19,9 @@ public static class WalletModule
         services.AddScoped<IWithdrawRepository, WithdrawRepository>();
         services.AddScoped<IWalletRepository, WalletRepository>();
 
+        // In-process replacement for the gRPC call PaymentAPI -> WalletAPI (T17).
+        services.AddScoped<SharedKernel.Contracts.Modules.IPaymentWalletGateway, WalletAPI.ModuleServices.PaymentWalletGateway>();
+
         var walletConn = Environment.GetEnvironmentVariable("WALLET_DB_CONNECTION")
             ?? configuration.GetConnectionString("WalletConnection")
             ?? configuration.GetConnectionString("DefaultConnection");
@@ -29,7 +32,6 @@ public static class WalletModule
 
         // Not registered here (no bus in the host until T20): the MassTransit consumers
         // (MissionRewardGranted, DebitWallet, RefundWallet) and the EF Outbox on WalletDbContext.
-        // Also not mapped: WalletGrpcService (gRPC is replaced in T16-T18).
 
         return services;
     }

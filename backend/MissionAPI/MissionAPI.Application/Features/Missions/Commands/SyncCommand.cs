@@ -2,13 +2,11 @@ using System;
 using MassTransit;
 using System.Threading;
 using System.Threading.Tasks;
-using ChapterAPI.Protos;
-using Grpc.Core;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using MissionAPI.Interfaces;
+using SharedKernel.Contracts.Modules;
 using SharedKernel.Enums;
-using SocialAPI.Protos;
 
 namespace MissionAPI.Application.Features.Missions.Commands
 {
@@ -20,19 +18,19 @@ namespace MissionAPI.Application.Features.Missions.Commands
     public class SyncCommandHandler : IRequestHandler<SyncCommand, Unit>
     {
         private readonly IMissionRepository _repository;
-        private readonly ChapterGrpc.ChapterGrpcClient _chapterClient;
-        private readonly SocialActivity.SocialActivityClient _socialClient;
+        private readonly IMissionChapterActivity _chapterActivity;
+        private readonly IMissionSocialActivity _socialActivity;
         private readonly ILogger<SyncCommandHandler> _logger;
 
         public SyncCommandHandler(
             IMissionRepository repository,
-            ChapterGrpc.ChapterGrpcClient chapterClient,
-            SocialActivity.SocialActivityClient socialClient,
+            IMissionChapterActivity chapterActivity,
+            IMissionSocialActivity socialActivity,
             ILogger<SyncCommandHandler> logger)
         {
             _repository = repository;
-            _chapterClient = chapterClient;
-            _socialClient = socialClient;
+            _chapterActivity = chapterActivity;
+            _socialActivity = socialActivity;
             _logger = logger;
         }
 
@@ -47,20 +45,17 @@ namespace MissionAPI.Application.Features.Missions.Commands
         {
             try
             {
-                var response = await _chapterClient.GetUserPurchaseActivitiesAsync(
-                    new GetUserPurchaseActivitiesRequest { UserId = userId },
-                    cancellationToken: cancellationToken);
-                foreach (var activity in response.Activities)
+                var activities = await _chapterActivity.GetUserPurchaseActivitiesAsync(userId, cancellationToken);
+                foreach (var activity in activities)
                 {
-                    if (!Guid.TryParse(activity.ChapterId, out var activityId)) continue;
                     await _repository.RecordActivityAsync(
                         userId,
                         MissionType.PurchaseChapter,
-                        activityId,
+                        activity.ChapterId,
                         FromUnixTime(activity.PurchasedAtUnixSeconds));
                 }
             }
-            catch (RpcException exception)
+            catch (ModuleCallException exception)
             {
                 _logger.LogWarning(exception, "Could not synchronize chapter purchases for user {UserId}.", userId);
             }
@@ -70,30 +65,26 @@ namespace MissionAPI.Application.Features.Missions.Commands
         {
             try
             {
-                var response = await _socialClient.GetUserActivitiesAsync(
-                    new GetUserActivitiesRequest { UserId = userId },
-                    cancellationToken: cancellationToken);
+                var response = await _socialActivity.GetUserActivitiesAsync(userId, cancellationToken);
                 foreach (var activity in response.ReadChapters)
                 {
-                    if (!Guid.TryParse(activity.ActivityId, out var activityId)) continue;
                     await _repository.RecordActivityAsync(
                         userId,
                         MissionType.ReadChapter,
-                        activityId,
+                        activity.ActivityId,
                         FromUnixTime(activity.OccurredAtUnixSeconds));
                 }
 
                 foreach (var activity in response.Comments)
                 {
-                    if (!Guid.TryParse(activity.ActivityId, out var activityId)) continue;
                     await _repository.RecordActivityAsync(
                         userId,
                         MissionType.LeaveComment,
-                        activityId,
+                        activity.ActivityId,
                         FromUnixTime(activity.OccurredAtUnixSeconds));
                 }
             }
-            catch (RpcException exception)
+            catch (ModuleCallException exception)
             {
                 _logger.LogWarning(exception, "Could not synchronize social activities for user {UserId}.", userId);
             }

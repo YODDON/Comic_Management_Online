@@ -1,4 +1,3 @@
-using ChapterAPI.Protos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PaymentAPI.Controllers;
@@ -6,7 +5,6 @@ using PaymentAPI.Data;
 using PaymentAPI.Interfaces;
 using PaymentAPI.Repositories;
 using PaymentAPI.Settings;
-using WalletAPI.Protos;
 
 namespace PaymentAPI;
 
@@ -25,18 +23,8 @@ public static class PaymentModule
 
         services.AddScoped<IPaymentRepository, PaymentRepository>();
 
-        // Still gRPC (replaced in T16-T18). The host does not serve gRPC (ChapterGrpcService and
-        // WalletGrpcService are not mapped), so these calls fail in the host until then.
-        // See "Remaining gRPC calls" in PLAN.md.
-        var chapterApiUrl = Environment.GetEnvironmentVariable("CHAPTER_API_URL") ?? configuration["GrpcEndpoints:ChapterAPI"] ?? "https://localhost:7147";
-        // Explicit client name: the default name is the type name without namespace ("ChapterGrpcClient"),
-        // which clashes with the ComicAPI and MissionAPI registrations once the modules share one host.
-        services.AddGrpcClient<ChapterGrpc.ChapterGrpcClient>("PaymentAPI.ChapterGrpcClient", o =>
-        {
-            o.Address = new Uri(chapterApiUrl);
-        });
-        var walletApiUrl = Environment.GetEnvironmentVariable("WALLET_API_URL") ?? configuration["GrpcEndpoints:WalletAPI"] ?? "http://localhost:5091";
-        services.AddGrpcClient<WalletService.WalletServiceClient>(o => o.Address = new Uri(walletApiUrl));
+        // IPaymentChapterGateway and IPaymentWalletGateway are registered by AddChapterModule and
+        // AddWalletModule (T17 group 3).
 
         services.Configure<TopUpSettings>(configuration.GetSection(TopUpSettings.SectionName));
         services.Configure<BankSettings>(configuration.GetSection(BankSettings.SectionName));

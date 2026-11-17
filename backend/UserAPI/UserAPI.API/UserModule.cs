@@ -30,6 +30,9 @@ public static class UserModule
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IAvatarStorageService, AvatarStorageService>();
 
+        // In-process replacement for the gRPC call ComicAPI -> UserAPI (T17).
+        services.AddScoped<SharedKernel.Contracts.Modules.IComicUserLookup, UserAPI.API.ModuleServices.ComicUserLookup>();
+
         return services;
     }
 

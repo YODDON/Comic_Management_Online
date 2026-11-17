@@ -13,15 +13,6 @@ services:
       - sqlserver_data:/var/opt/mssql
     restart: always
 
-  redis:
-    image: redis:alpine
-    container_name: prn232_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: always
-
   rabbitmq:
     image: rabbitmq:3-management
     container_name: prn232_rabbitmq
@@ -37,5 +28,4 @@ services:
 
 volumes:
   sqlserver_data:
-  redis_data:
   rabbitmq_data:

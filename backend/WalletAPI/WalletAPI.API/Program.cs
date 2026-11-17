@@ -9,8 +9,6 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-builder.Services.AddGrpc();
-
 // Standalone API keeps its old localhost fallback; the module itself has no hardcoded default.
 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WALLET_DB_CONNECTION"))
     && string.IsNullOrEmpty(builder.Configuration.GetConnectionString("WalletConnection"))
@@ -81,6 +79,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapGrpcService<WalletAPI.GrpcServices.WalletGrpcService>();
 
 app.Run();

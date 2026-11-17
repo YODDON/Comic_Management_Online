@@ -19,30 +19,14 @@ public static class ComicModule
         }
 
         // Used by GetHotComics, GetOutstandingComicsList and GetLastCompletedComics (IDistributedCache).
-        // The standalone API still uses Redis; the host uses the in-memory cache (T19 finishes the switch).
+        // In-memory cache for both the host and the standalone API (Redis removed in T19).
         services.AddDistributedMemoryCache();
 
         services.Configure<ComicAPI.Infrastructure.Settings.CloudinarySettings>(configuration.GetSection("Cloudinary"));
         services.AddScoped<ComicAPI.Application.Interfaces.ICloudinaryService, ComicAPI.Infrastructure.Services.CloudinaryService>();
 
-
-        // Still gRPC (replaced in T16-T18). The host does not serve gRPC, so these calls
-        // fail at runtime in the host; the handlers catch the error and use a fallback.
-        var userApiUrl = Environment.GetEnvironmentVariable("USER_API_URL")
-            ?? configuration["GrpcSettings:UserApiUrl"]
-            ?? "http://localhost:5054";
-        services.AddGrpcClient<UserAPI.Protos.UserService.UserServiceClient>(o =>
-        {
-            o.Address = new Uri(userApiUrl);
-        });
-
-        var chapterApiUrl = Environment.GetEnvironmentVariable("CHAPTER_API_URL")
-            ?? configuration["GrpcEndpoints:ChapterAPI"]
-            ?? "http://localhost:5115";
-        services.AddGrpcClient<ChapterAPI.Protos.ChapterGrpc.ChapterGrpcClient>(o =>
-        {
-            o.Address = new Uri(chapterApiUrl);
-        });
+        // IComicUserLookup and IComicChapterLookup (author names, chapter counts, purchased comics) are
+        // registered by AddUserModule and AddChapterModule (T17).
 
         services.AddScoped<ComicAPI.Domain.Interfaces.ICategoryRepository, ComicAPI.Infrastructure.Repositories.CategoryRepository>();
         services.AddScoped<ComicAPI.Domain.Interfaces.IComicRepository, ComicAPI.Infrastructure.Repositories.ComicRepository>();

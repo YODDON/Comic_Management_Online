@@ -4,13 +4,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
-using ChapterAPI.Protos;
 using ComicAPI.Application.DTOs;
 using ComicAPI.Application.Features.Comics.Helpers;
 using ComicAPI.Domain.Interfaces;
 using MediatR;
 using SharedKernel.Responses;
-using UserAPI.Protos;
+using SharedKernel.Contracts.Modules;
 
 namespace ComicAPI.Application.Features.Comics.Queries
 {
@@ -25,15 +24,15 @@ namespace ComicAPI.Application.Features.Comics.Queries
     {
         private readonly IComicRepository _comicRepository;
         private readonly IMapper _mapper;
-        private readonly UserService.UserServiceClient _userServiceClient;
-        private readonly ChapterGrpc.ChapterGrpcClient _chapterServiceClient;
+        private readonly IComicUserLookup _userLookup;
+        private readonly IComicChapterLookup _chapterLookup;
 
-        public GetPurchasedComicsQueryHandler(IComicRepository comicRepository, IMapper mapper, UserService.UserServiceClient userServiceClient, ChapterGrpc.ChapterGrpcClient chapterServiceClient)
+        public GetPurchasedComicsQueryHandler(IComicRepository comicRepository, IMapper mapper, IComicUserLookup userLookup, IComicChapterLookup chapterLookup)
         {
             _comicRepository = comicRepository;
             _mapper = mapper;
-            _userServiceClient = userServiceClient;
-            _chapterServiceClient = chapterServiceClient;
+            _userLookup = userLookup;
+            _chapterLookup = chapterLookup;
         }
 
         public async Task<ApiResponse<PagedResult<ComicSummaryDto>>> Handle(GetPurchasedComicsQuery request, CancellationToken cancellationToken)
@@ -44,10 +43,8 @@ namespace ComicAPI.Application.Features.Comics.Queries
             List<Guid> purchasedComicIds;
             try
             {
-                var response = await _chapterServiceClient.GetPurchasedComicIdsAsync(
-                    new GetPurchasedComicIdsRequest { UserId = request.UserId }, cancellationToken: cancellationToken);
-                purchasedComicIds = response.ComicIds
-                    .Select(id => Guid.TryParse(id, out var comicId) ? comicId : Guid.Empty)
+                var response = await _chapterLookup.GetPurchasedComicIdsAsync(request.UserId, cancellationToken);
+                purchasedComicIds = response
                     .Where(id => id != Guid.Empty)
                     .Distinct()
                     .ToList();
@@ -67,7 +64,7 @@ namespace ComicAPI.Application.Features.Comics.Queries
 
             var (comics, totalCount) = await _comicRepository.GetComicsByIdsAsync(purchasedComicIds, pageNumber, pageSize);
             var dtos = _mapper.Map<List<ComicSummaryDto>>(comics);
-            await ComicHelper.EnrichComicsWithAuthorNamesAsync(_userServiceClient, dtos, comics);
+            await ComicHelper.EnrichComicsWithAuthorNamesAsync(_userLookup, dtos, comics);
 
             var pagedResult = new PagedResult<ComicSummaryDto>(dtos, totalCount, pageNumber, pageSize);
             return new ApiResponse<PagedResult<ComicSummaryDto>>(pagedResult, "Purchased comics retrieved.", 200);

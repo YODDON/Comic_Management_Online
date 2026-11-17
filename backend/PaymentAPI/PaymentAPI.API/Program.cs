@@ -8,8 +8,6 @@ using PaymentAPI.Data;
 using PaymentAPI.Interfaces;
 using PaymentAPI.Repositories;
 using PaymentAPI.Services;
-using ChapterAPI.Protos;
-using WalletAPI.Protos;
 using Microsoft.Extensions.Options;
 using PaymentAPI.Settings;
 using MassTransit;
@@ -22,7 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-// Controllers, DbContext, repository, MediatR, gRPC clients, TopUp/Bank settings: see PaymentModule.cs.
+// Controllers, DbContext, repository, MediatR, TopUp/Bank settings: see PaymentModule.cs.
 builder.Services.AddPaymentModule(builder.Configuration);
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PaymentAPI.Application.Features.Payments.Queries.GetBalanceQuery).Assembly));
 

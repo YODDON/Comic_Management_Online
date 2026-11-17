@@ -2,12 +2,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
-using ChapterAPI.Protos;
 using ComicAPI.Application.DTOs;
 using ComicAPI.Domain.Interfaces;
 using MediatR;
 using SharedKernel.Responses;
-using UserAPI.Protos;
+using SharedKernel.Contracts.Modules;
 
 namespace ComicAPI.Application.Features.Comics.Queries
 {
@@ -20,15 +19,15 @@ namespace ComicAPI.Application.Features.Comics.Queries
     {
         private readonly IComicRepository _comicRepository;
         private readonly IMapper _mapper;
-        private readonly UserService.UserServiceClient _userServiceClient;
-        private readonly ChapterGrpc.ChapterGrpcClient _chapterServiceClient;
+        private readonly IComicUserLookup _userLookup;
+        private readonly IComicChapterLookup _chapterLookup;
 
-        public GetComicBySlugQueryHandler(IComicRepository comicRepository, IMapper mapper, UserService.UserServiceClient userServiceClient, ChapterGrpc.ChapterGrpcClient chapterServiceClient)
+        public GetComicBySlugQueryHandler(IComicRepository comicRepository, IMapper mapper, IComicUserLookup userLookup, IComicChapterLookup chapterLookup)
         {
             _comicRepository = comicRepository;
             _mapper = mapper;
-            _userServiceClient = userServiceClient;
-            _chapterServiceClient = chapterServiceClient;
+            _userLookup = userLookup;
+            _chapterLookup = chapterLookup;
         }
 
         public async Task<ApiResponse<ComicDetailDto>> Handle(GetComicBySlugQuery request, CancellationToken cancellationToken)
@@ -50,11 +49,8 @@ namespace ComicAPI.Application.Features.Comics.Queries
             {
                 try
                 {
-                    var userRequest = new GetUsersByIdsRequest();
-                    userRequest.Ids.Add(comic.OwnerId.ToString());
-
-                    var response = await _userServiceClient.GetUsersByIdsAsync(userRequest, cancellationToken: cancellationToken);
-                    var user = response.Users.FirstOrDefault();
+                    var users = await _userLookup.GetUsersByIdsAsync(new[] { comic.OwnerId }, cancellationToken);
+                    var user = users.FirstOrDefault();
                     dto.AuthorName = user != null ? user.Username : "Unknown";
                 }
                 catch
@@ -65,9 +61,7 @@ namespace ComicAPI.Application.Features.Comics.Queries
 
             try
             {
-                var chapterResponse = await _chapterServiceClient.GetChapterCountAsync(
-                    new GetChapterCountRequest { ComicId = comic.Id.ToString() }, cancellationToken: cancellationToken);
-                dto.ChapterCount = chapterResponse.Count;
+                dto.ChapterCount = await _chapterLookup.GetChapterCountAsync(comic.Id, cancellationToken);
             }
             catch
             {

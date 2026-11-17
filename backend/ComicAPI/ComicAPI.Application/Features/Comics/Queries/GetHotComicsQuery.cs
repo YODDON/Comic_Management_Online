@@ -10,7 +10,7 @@ using ComicAPI.Domain.Interfaces;
 using MediatR;
 using Microsoft.Extensions.Caching.Distributed;
 using SharedKernel.Responses;
-using UserAPI.Protos;
+using SharedKernel.Contracts.Modules;
 
 namespace ComicAPI.Application.Features.Comics.Queries
 {
@@ -23,14 +23,14 @@ namespace ComicAPI.Application.Features.Comics.Queries
     {
         private readonly IComicRepository _comicRepository;
         private readonly IMapper _mapper;
-        private readonly UserService.UserServiceClient _userServiceClient;
+        private readonly IComicUserLookup _userLookup;
         private readonly IDistributedCache _cache;
 
-        public GetHotComicsQueryHandler(IComicRepository comicRepository, IMapper mapper, UserService.UserServiceClient userServiceClient, IDistributedCache cache)
+        public GetHotComicsQueryHandler(IComicRepository comicRepository, IMapper mapper, IComicUserLookup userLookup, IDistributedCache cache)
         {
             _comicRepository = comicRepository;
             _mapper = mapper;
-            _userServiceClient = userServiceClient;
+            _userLookup = userLookup;
             _cache = cache;
         }
 
@@ -48,7 +48,7 @@ namespace ComicAPI.Application.Features.Comics.Queries
 
             var comics = await _comicRepository.GetHotComicsAsync(limit);
             var dtos = _mapper.Map<List<ComicSummaryDto>>(comics);
-            await ComicHelper.EnrichComicsWithAuthorNamesAsync(_userServiceClient, dtos, comics);
+            await ComicHelper.EnrichComicsWithAuthorNamesAsync(_userLookup, dtos, comics);
             
             var serializedDtos = JsonSerializer.Serialize(dtos);
             await _cache.SetStringAsync(cacheKey, serializedDtos, new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10) }, cancellationToken);
