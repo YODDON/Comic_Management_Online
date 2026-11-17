@@ -49,8 +49,8 @@ public static class SocialModule
         // In-process replacement for the gRPC call MissionAPI -> SocialAPI (T17).
         services.AddScoped<SharedKernel.Contracts.Modules.IMissionSocialActivity, SocialAPI.API.ModuleServices.MissionSocialActivity>();
 
-        // Not registered here: MassTransit (the host owns the single bus, see Program.cs),
-        // and the EF Outbox.
+        // Not registered here: MassTransit (the host owns the single bus, see Program.cs). Social has
+        // no consumers, it only publishes. The host bus has no EF Outbox until T22 decides (T20).
 
         return services;
     }

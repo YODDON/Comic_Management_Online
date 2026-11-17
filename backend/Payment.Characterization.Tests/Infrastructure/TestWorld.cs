@@ -40,9 +40,17 @@ public enum Topology
 
     /// <summary>
     /// The target of T20/T21: one host, one in-memory bus, no outbox. Only used to show whether the saga
-    /// behaves the same without RabbitMQ.
+    /// behaves the same without RabbitMQ. Since T20 the consumers, saga and endpoints come from the modules'
+    /// own AddXxxConsumers / ConfigureXxxEndpoints, the methods the monolith host calls.
     /// </summary>
     SingleInMemoryBus,
+
+    /// <summary>
+    /// The monolith host after T20: one bus on RabbitMQ, no outbox, consumers, saga and endpoints registered by
+    /// the modules' AddXxxConsumers / ConfigureXxxEndpoints (Payment, Wallet, Chapter; the host also has Comic and
+    /// Mission consumers, which are not part of a purchase).
+    /// </summary>
+    SingleHostBusOnRabbitMq,
 }
 
 public sealed class WorldOptions
@@ -146,7 +154,7 @@ public sealed class TestWorld : IAsyncDisposable
     // ---------- building ----------
     private async Task BuildAsync(TestDatabases dbs)
     {
-        if (Options.Topology == Topology.SingleInMemoryBus)
+        if (Options.Topology is Topology.SingleInMemoryBus or Topology.SingleHostBusOnRabbitMq)
         {
             var host = Host(services =>
             {
@@ -155,15 +163,22 @@ public sealed class TestWorld : IAsyncDisposable
                 AddChapter(services, dbs);
                 services.AddMassTransit(x =>
                 {
-                    AddPaymentBus(x, outbox: false);
-                    AddWalletBus(x, outbox: false);
-                    AddChapterBus(x, outbox: false);
-                    x.UsingInMemory((ctx, cfg) =>
+                    // The modules' own registrations, as called by ComicMonolith.Api/Program.cs (T20).
+                    PaymentAPI.PaymentModule.AddPaymentConsumers(x);
+                    walletserver::WalletAPI.WalletModule.AddWalletConsumers(x);
+                    chapterserver::ChapterAPI.ChapterModule.AddChapterConsumers(x);
+
+                    void Endpoints(IBusFactoryConfigurator cfg, IBusRegistrationContext ctx)
                     {
-                        PaymentEndpoints(cfg, ctx);
-                        WalletEndpoints(cfg, ctx);
-                        ChapterEndpoints(cfg, ctx);
-                    });
+                        PaymentAPI.PaymentModule.ConfigurePaymentEndpoints(cfg, ctx);
+                        walletserver::WalletAPI.WalletModule.ConfigureWalletEndpoints(cfg, ctx);
+                        chapterserver::ChapterAPI.ChapterModule.ConfigureChapterEndpoints(cfg, ctx);
+                    }
+
+                    if (Options.Topology == Topology.SingleHostBusOnRabbitMq)
+                        x.UsingRabbitMq((ctx, cfg) => { RabbitHost(cfg); Endpoints(cfg, ctx); });
+                    else
+                        x.UsingInMemory((ctx, cfg) => Endpoints(cfg, ctx));
                 });
             });
             _payment = _wallet = _chapter = host;
@@ -300,12 +315,15 @@ public sealed class TestWorld : IAsyncDisposable
     {
         if (outbox)
             x.AddEntityFrameworkOutbox<WalletDbContext>(o => { o.UseSqlServer(); o.UseBusOutbox(); });
+        // Added by T20 (RedeliveryTests): WalletAPI's Program.cs registers this consumer too.
+        x.AddConsumer<walletserver::WalletAPI.Consumers.MissionRewardGrantedConsumer>();
         x.AddConsumer<DebitWalletConsumer>();
         x.AddConsumer<RefundWalletConsumer>();
     }
 
     private static void WalletEndpoints(IBusFactoryConfigurator cfg, IBusRegistrationContext ctx)
     {
+        cfg.ReceiveEndpoint("mission-reward-granted", e => e.ConfigureConsumer<walletserver::WalletAPI.Consumers.MissionRewardGrantedConsumer>(ctx));
         cfg.ReceiveEndpoint("debit-wallet", e => e.ConfigureConsumer<DebitWalletConsumer>(ctx));
         cfg.ReceiveEndpoint("refund-wallet", e => e.ConfigureConsumer<RefundWalletConsumer>(ctx));
     }

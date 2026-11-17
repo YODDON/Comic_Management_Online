@@ -1,4 +1,6 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using MissionAPI.Consumers;
 using MissionAPI.Controllers;
 using MissionAPI.Data;
 
@@ -43,10 +45,23 @@ public static class MissionModule
         // SyncCommand calls IMissionChapterActivity and IMissionSocialActivity in-process (T17 group 2);
         // they are registered by AddChapterModule and AddSocialModule.
 
-        // Not registered here: MassTransit, the EF Outbox and MissionActivityRecordedConsumer
-        // (the host owns the single bus; the consumer does not run in the host until T20).
+        // Not registered here: MassTransit. The host owns the single bus and calls AddMissionConsumers /
+        // ConfigureMissionEndpoints below (T20). The host bus has no EF Outbox until T22 decides.
 
         return services;
+    }
+
+    /// <summary>Consumers of this module on the host's single bus (T20). Same as MissionAPI's Program.cs, without the EF Outbox.</summary>
+    public static IBusRegistrationConfigurator AddMissionConsumers(this IBusRegistrationConfigurator bus)
+    {
+        bus.AddConsumer<MissionActivityRecordedConsumer>();
+        return bus;
+    }
+
+    /// <summary>Receive endpoints of this module (T20). Queue names unchanged from MissionAPI's Program.cs.</summary>
+    public static void ConfigureMissionEndpoints(this IBusFactoryConfigurator cfg, IBusRegistrationContext context)
+    {
+        cfg.ReceiveEndpoint("mission-activity-recorded", e => e.ConfigureConsumer<MissionActivityRecordedConsumer>(context));
     }
 
     public static WebApplication UseMissionModule(this WebApplication app)

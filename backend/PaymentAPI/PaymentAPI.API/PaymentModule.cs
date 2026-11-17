@@ -1,7 +1,11 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using PaymentAPI.Application.Consumers;
+using PaymentAPI.Application.Sagas;
 using PaymentAPI.Controllers;
 using PaymentAPI.Data;
+using PaymentAPI.Domain.Entities;
 using PaymentAPI.Interfaces;
 using PaymentAPI.Repositories;
 using PaymentAPI.Settings;
@@ -29,12 +33,37 @@ public static class PaymentModule
         services.Configure<TopUpSettings>(configuration.GetSection(TopUpSettings.SectionName));
         services.Configure<BankSettings>(configuration.GetSection(BankSettings.SectionName));
 
-        // Not registered here: MassTransit, the EF Outbox, PurchaseStateMachine (the saga) and
-        // PurchaseCompletedConsumer / PurchaseFailedConsumer. The host owns the single bus, and these
-        // do not run in the host until T20. Until then a chapter purchase started in the host is never
-        // completed by the saga.
+        // Not registered here: MassTransit. The host owns the single bus and calls AddPaymentConsumers /
+        // ConfigurePaymentEndpoints below (T20). The host bus has no EF Outbox until T22 decides.
 
         return services;
+    }
+
+    /// <summary>
+    /// Consumers and the PurchaseStateMachine saga of this module on the host's single bus (T20).
+    /// Same as PaymentAPI's Program.cs (saga stored in PaymentDbContext), without the EF Outbox.
+    /// </summary>
+    public static IBusRegistrationConfigurator AddPaymentConsumers(this IBusRegistrationConfigurator bus)
+    {
+        bus.AddConsumer<PurchaseCompletedConsumer>();
+        bus.AddConsumer<PurchaseFailedConsumer>();
+
+        bus.AddSagaStateMachine<PurchaseStateMachine, PurchaseState>()
+            .EntityFrameworkRepository(r =>
+            {
+                r.ExistingDbContext<PaymentDbContext>();
+                r.UseSqlServer();
+            });
+
+        return bus;
+    }
+
+    /// <summary>Receive endpoints of this module (T20). Queue names unchanged from PaymentAPI's Program.cs.</summary>
+    public static void ConfigurePaymentEndpoints(this IBusFactoryConfigurator cfg, IBusRegistrationContext context)
+    {
+        cfg.ReceiveEndpoint("payment-purchase-completed", e => e.ConfigureConsumer<PurchaseCompletedConsumer>(context));
+        cfg.ReceiveEndpoint("payment-purchase-failed", e => e.ConfigureConsumer<PurchaseFailedConsumer>(context));
+        cfg.ReceiveEndpoint("purchase-state", e => e.ConfigureSaga<PurchaseState>(context));
     }
 
     public static WebApplication UsePaymentModule(this WebApplication app)

@@ -304,6 +304,22 @@ public class PurchaseSagaTests_InMemory : PurchaseSagaScenarios
     [Fact] public Task Saga_answers_with_the_types_the_handler_awaits() => Saga_response_types_match_the_request_client();
 }
 
+/// <summary>The monolith host's single RabbitMQ bus without outbox, built from the modules' own registrations (T20).</summary>
+[Collection(T37Collection.Name)]
+public class PurchaseSagaTests_HostBusRabbitMq : PurchaseSagaScenarios
+{
+    private readonly T37Fixture _fixture;
+    public PurchaseSagaTests_HostBusRabbitMq(T37Fixture fixture) => _fixture = fixture;
+    protected override Task<TestWorld> WorldAsync() => _fixture.HostBusAsync();
+
+    [RabbitMqFact] public Task Purchase_with_enough_balance_debits_unlocks_and_answers_200() => Purchase_with_enough_balance_debits_and_unlocks();
+    [RabbitMqFact] public Task Insufficient_balance_fails_without_charging_and_answers_402() => Insufficient_balance_fails_without_charging();
+    [RabbitMqFact] public Task Wallet_debit_failure_fails_without_charging_and_answers_402() => Wallet_debit_failure_fails_without_charging();
+    [RabbitMqFact] public Task Chapter_unlock_failure_refunds_the_debit_and_answers_402() => Chapter_unlock_failure_refunds_the_debit();
+    [RabbitMqFact] public Task Purchase_without_a_requester_still_completes_the_transaction() => Purchase_without_a_requester_still_completes();
+    [RabbitMqFact] public Task Saga_answers_with_the_types_the_handler_awaits() => Saga_response_types_match_the_request_client();
+}
+
 /// <summary>The handler's catch-all path: the committed Purchase transaction is marked Failed, not inserted again.</summary>
 [Collection(T37Collection.Name)]
 public class SaveFailedTransactionTests
