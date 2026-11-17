@@ -23,6 +23,7 @@ public sealed class T37Fixture : IAsyncLifetime
     {
         world.Grpc.Unavailable.Clear();
         world.FailChapterUnlock = false;
+        world.FailWalletDebit = false;
         world.Messages.Clear();
         world.States.Clear();
         return world;
@@ -42,12 +43,12 @@ public sealed class T37Collection : ICollectionFixture<T37Fixture>
     public const string Name = "T37";
 }
 
-/// <summary>Runs only when a RabbitMQ broker answers (T37_RABBITMQ_HOST, default localhost:5672); otherwise reported as skipped.</summary>
+/// <summary>Runs only when a RabbitMQ broker answers (T37_RABBITMQ_HOST and T37_RABBITMQ_PORT, default localhost:5672); otherwise reported as skipped.</summary>
 public sealed class RabbitMqFactAttribute : FactAttribute
 {
     public RabbitMqFactAttribute()
     {
         if (!TestWorld.RabbitMqReachable())
-            Skip = $"No RabbitMQ broker on {TestWorld.RabbitMqHost}:5672 (start one, e.g. a throwaway rabbitmq:3 container).";
+            Skip = $"No RabbitMQ broker on {TestWorld.RabbitMqHost}:{TestWorld.RabbitMqPort} (start one, e.g. a throwaway rabbitmq:3 container).";
     }
 }

@@ -33,7 +33,7 @@ namespace WalletAPI.Application.Consumers
                 var result = await _repository.CreditAsync(
                     msg.UserId,
                     msg.Amount,
-                    msg.TransactionId,
+                    referenceId,
                     TransactionType.Refund,
                     $"Hoàn tiền do lỗi mở chapter, Transaction: {msg.TransactionId}");
 
