@@ -42,8 +42,8 @@ public static class MissionModule
                 ?? "";
         });
 
-        // Still gRPC (replaced in T16-T18). The host does not serve gRPC (ChapterGrpcService and
-        // SocialActivityGrpcService are not mapped), so SyncCommand fails in the host until then.
+        // The two gRPC clients below are no longer used: SyncCommand calls IMissionChapterActivity and
+        // IMissionSocialActivity in-process (T17 group 2). T18 deletes the clients.
         // See "Remaining gRPC calls" in PLAN.md.
         var chapterApiUrl = Environment.GetEnvironmentVariable("CHAPTER_API_URL")
             ?? configuration["GrpcEndpoints:ChapterAPI"]
