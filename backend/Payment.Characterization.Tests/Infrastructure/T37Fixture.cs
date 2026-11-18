@@ -8,22 +8,48 @@ public sealed class T37Fixture : IAsyncLifetime
 {
     private TestWorld? _inMemory;
     private TestWorld? _rabbit;
+    private TestWorld? _hostBus;
+
+    /// <summary>
+    /// T20: set T37_WORLD=HostBus to run EVERY test (in-memory and RabbitMQ ones alike) on the host-style single
+    /// RabbitMQ bus (needs a broker). Unset: each test uses the world its class asks for.
+    /// </summary>
+    private static bool AllOnHostBus =>
+        string.Equals(Environment.GetEnvironmentVariable("T37_WORLD"), "HostBus", StringComparison.OrdinalIgnoreCase);
 
     public TestDatabases Dbs { get; } = new();
 
     public Task InitializeAsync() => Dbs.InitializeAsync();
 
-    public async Task<TestWorld> InMemoryAsync() =>
-        Reset(_inMemory ??= await TestWorld.StartAsync(Dbs, new WorldOptions { Topology = Topology.SingleInMemoryBus }));
+    public async Task<TestWorld> InMemoryAsync() => AllOnHostBus
+        ? await HostBusAsync()
+        : Reset(_inMemory ??= await TestWorld.StartAsync(Dbs, new WorldOptions { Topology = Topology.SingleInMemoryBus }));
 
-    public async Task<TestWorld> RabbitMqAsync() =>
-        Reset(_rabbit ??= await TestWorld.StartAsync(Dbs, new WorldOptions { Topology = Topology.SeparateBusesOnRabbitMq }));
+    public async Task<TestWorld> RabbitMqAsync()
+    {
+        if (AllOnHostBus) return await HostBusAsync();
+        // The two RabbitMQ worlds bind the same queue names; only one may be running, or they would steal each other's messages.
+        if (_hostBus != null) { await _hostBus.DisposeAsync(); _hostBus = null; }
+        return Reset(_rabbit ??= await TestWorld.StartAsync(Dbs, new WorldOptions { Topology = Topology.SeparateBusesOnRabbitMq }));
+    }
+
+    /// <summary>The monolith host's single bus on RabbitMQ (T20).</summary>
+    public async Task<TestWorld> HostBusAsync()
+    {
+        if (_rabbit != null) { await _rabbit.DisposeAsync(); _rabbit = null; }
+        return Reset(_hostBus ??= await TestWorld.StartAsync(Dbs, new WorldOptions { Topology = Topology.SingleHostBusOnRabbitMq }));
+    }
 
     private static TestWorld Reset(TestWorld world)
     {
         world.Grpc.Unavailable.Clear();
+        world.Grpc.AfterUnlockCheck = null;
+        world.Grpc.AfterChapterInfo = null;
         world.FailChapterUnlock = false;
         world.FailWalletDebit = false;
+        world.FailChapterSave = false;
+        world.BeforeChapterUnlock = null;
+        world.BeforeChapterSave = null;
         world.Messages.Clear();
         world.States.Clear();
         return world;
@@ -33,6 +59,7 @@ public sealed class T37Fixture : IAsyncLifetime
     {
         if (_inMemory != null) await _inMemory.DisposeAsync();
         if (_rabbit != null) await _rabbit.DisposeAsync();
+        if (_hostBus != null) await _hostBus.DisposeAsync();
         await Dbs.DisposeAsync();
     }
 }

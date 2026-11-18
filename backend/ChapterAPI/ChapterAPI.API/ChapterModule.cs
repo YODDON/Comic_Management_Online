@@ -1,8 +1,10 @@
+using ChapterAPI.Application.Consumers;
 using ChapterAPI.Controllers;
 using ChapterAPI.Data;
 using ChapterAPI.Interfaces;
 using ChapterAPI.Repositories;
 using ChapterAPI.Services;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChapterAPI;
@@ -44,10 +46,23 @@ public static class ChapterModule
         // In-process replacement for the gRPC calls PaymentAPI -> ChapterAPI (T17).
         services.AddScoped<SharedKernel.Contracts.Modules.IPaymentChapterGateway, ChapterAPI.ModuleServices.PaymentChapterGateway>();
 
-        // Not registered here: MassTransit (the host owns the single bus, see Program.cs),
-        // UnlockChapterConsumer and the EF Outbox.
+        // Not registered here: MassTransit. The host owns the single bus and calls AddChapterConsumers /
+        // ConfigureChapterEndpoints below (T20). The host bus has no EF Outbox until T22 decides.
 
         return services;
+    }
+
+    /// <summary>Consumers of this module on the host's single bus (T20). Same as ChapterAPI's Program.cs, without the EF Outbox.</summary>
+    public static IBusRegistrationConfigurator AddChapterConsumers(this IBusRegistrationConfigurator bus)
+    {
+        bus.AddConsumer<UnlockChapterConsumer>();
+        return bus;
+    }
+
+    /// <summary>Receive endpoints of this module (T20). Queue names unchanged from ChapterAPI's Program.cs.</summary>
+    public static void ConfigureChapterEndpoints(this IBusFactoryConfigurator cfg, IBusRegistrationContext context)
+    {
+        cfg.ReceiveEndpoint("unlock-chapter", e => e.ConfigureConsumer<UnlockChapterConsumer>(context));
     }
 
     public static WebApplication UseChapterModule(this WebApplication app)

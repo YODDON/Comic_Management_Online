@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using SharedKernel.Contracts.Modules;
 using WalletAPI.Application.Features.Wallet.Commands;
+using WalletAPI.Application.Features.Wallet.Queries;
 
 namespace WalletAPI.ModuleServices;
 
@@ -59,6 +60,61 @@ public sealed class PaymentWalletGateway : IPaymentWalletGateway
         catch (Exception ex)
         {
             throw new ModuleCallException("WalletAPI could not credit the wallet.", ex);
+        }
+    }
+
+    public async Task<WalletLedgerEntry?> GetLedgerEntryAsync(Guid referenceId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+            var entry = await mediator.Send(new GetLedgerEntryByReferenceQuery { ReferenceId = referenceId }, cancellationToken);
+            return entry == null ? null : new WalletLedgerEntry(entry.UserId, entry.Amount, entry.Type.ToString());
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new ModuleCallException("WalletAPI could not read the ledger.", ex);
+        }
+    }
+
+    public async Task<WalletCreditResult> RefundPurchaseAsync(
+        int userId,
+        decimal amount,
+        Guid transactionId,
+        CancellationToken cancellationToken = default)
+    {
+        if (userId <= 0 || amount <= 0)
+        {
+            throw new ModuleCallException("Invalid wallet request.");
+        }
+
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+            var result = await mediator.Send(new RefundPurchaseCommand
+            {
+                UserId = userId,
+                Amount = amount,
+                TransactionId = transactionId
+            }, cancellationToken);
+
+            return new WalletCreditResult(
+                Success: true,
+                Message: result.AlreadyProcessed ? "Already processed." : "Refunded.");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new ModuleCallException("WalletAPI could not refund the purchase.", ex);
         }
     }
 }

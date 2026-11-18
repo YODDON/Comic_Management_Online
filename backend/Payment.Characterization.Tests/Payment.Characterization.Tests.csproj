@@ -6,7 +6,7 @@
     SQL Server LocalDB) and pin what it does today. No production code is changed or copied.
     Named *.Characterization.Tests on purpose: backend/.gitignore ignores "PaymentAPI.Tests/" (old projects).
     Packages: the same test packages as ComicMonolith.Api.Tests, plus MassTransit.RabbitMQ 8.3.0 (the version
-    already used by the APIs) for the RabbitMQ runs (skipped when no broker answers on T37_RABBITMQ_HOST:5672).
+    the APIs used; since T21 only this test project references it) for the RabbitMQ runs (skipped when no broker answers on T37_RABBITMQ_HOST:5672).
   -->
 
   <PropertyGroup>
@@ -48,6 +48,9 @@
     <ProjectReference Include="..\ChapterAPI\ChapterAPI.Application\ChapterAPI.Application.csproj" />
     <ProjectReference Include="..\ChapterAPI\ChapterAPI.Infrastructure\ChapterAPI.Infrastructure.csproj" />
     <ProjectReference Include="..\ChapterAPI\ChapterAPI.API\ChapterAPI.API.csproj" Aliases="chapterserver" />
+
+    <!-- T44: the real CompleteMissionStepCommandHandler (mission reward publish order). -->
+    <ProjectReference Include="..\MissionAPI\MissionAPI.Application\MissionAPI.Application.csproj" />
   </ItemGroup>
 
 </Project>

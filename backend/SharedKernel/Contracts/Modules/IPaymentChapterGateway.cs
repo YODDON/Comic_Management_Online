@@ -24,6 +24,12 @@ public interface IPaymentChapterGateway
         int userId,
         Guid chapterId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// True when the user has the chapter's unlock row (ChapterDB <c>UserPurchases</c>). Read only. Used by the
+    /// purchase recovery job (T23). Any failure is a <see cref="ModuleCallException"/>.
+    /// </summary>
+    Task<bool> IsChapterUnlockedAsync(int userId, Guid chapterId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

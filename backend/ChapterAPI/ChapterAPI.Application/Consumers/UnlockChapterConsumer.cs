@@ -18,18 +18,39 @@ namespace ChapterAPI.Application.Consumers
         public async Task Consume(ConsumeContext<UnlockChapterCommand> context)
         {
             var msg = context.Message;
-            
+
+            // T43: exactly one of ChapterUnlockedEvent / ChapterUnlockFailedEvent is published per command, and
+            // ChapterUnlockedEvent only after the unlock row is saved. Before T43 "unlocked" was published before the
+            // save, so a failed save (or a missing chapter) finalized the saga as a success without an unlock.
+            string? failure;
             try
             {
+                // true: the unlock row was added, or it already existed. false: the chapter does not exist.
                 var unlocked = await _repository.UnlockChapterAsync(msg.UserId, msg.ChapterId);
-                // `unlocked` is true if a new record was added, or false if already unlocked.
-                // In both cases, the chapter is considered unlocked.
-                await context.Publish(new ChapterUnlockedEvent(msg.CorrelationId));
-                await _repository.SaveChangesAsync();
+                if (unlocked)
+                {
+                    await _repository.SaveChangesAsync();
+                    failure = null;
+                }
+                else
+                {
+                    failure = "Chapter không tồn tại.";
+                }
             }
             catch (Exception ex)
             {
-                await context.Publish(new ChapterUnlockFailedEvent(msg.CorrelationId, $"Lỗi hệ thống khi mở khóa chapter: {ex.Message}"));
+                // Also a unique-index clash on (UserId, ChapterId) with an unlock row saved at the same time by another
+                // purchase: this purchase is then refunded by the saga.
+                failure = $"Lỗi hệ thống khi mở khóa chapter: {ex.Message}";
+            }
+
+            if (failure == null)
+            {
+                await context.Publish(new ChapterUnlockedEvent(msg.CorrelationId));
+            }
+            else
+            {
+                await context.Publish(new ChapterUnlockFailedEvent(msg.CorrelationId, failure));
             }
         }
     }

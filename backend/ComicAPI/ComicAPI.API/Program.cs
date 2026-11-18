@@ -48,14 +48,8 @@ builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<ComicViewedEventConsumer>();
 
-    x.UsingRabbitMq((context, cfg) =>
+    x.UsingInMemory((context, cfg) =>
     {
-        var rabbitmqHost = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? builder.Configuration["RabbitMQ:Host"] ?? "localhost";
-        cfg.Host(rabbitmqHost, "/", h => {
-            h.Username("guest");
-            h.Password("guest");
-        });
-
         cfg.ReceiveEndpoint("comic-viewed", e =>
         {
             e.ConfigureConsumer<ComicViewedEventConsumer>(context);

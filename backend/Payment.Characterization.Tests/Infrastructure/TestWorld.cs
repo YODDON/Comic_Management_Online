@@ -40,9 +40,17 @@ public enum Topology
 
     /// <summary>
     /// The target of T20/T21: one host, one in-memory bus, no outbox. Only used to show whether the saga
-    /// behaves the same without RabbitMQ.
+    /// behaves the same without RabbitMQ. Since T20 the consumers, saga and endpoints come from the modules'
+    /// own AddXxxConsumers / ConfigureXxxEndpoints, the methods the monolith host calls.
     /// </summary>
     SingleInMemoryBus,
+
+    /// <summary>
+    /// The monolith host after T20: one bus on RabbitMQ, no outbox, consumers, saga and endpoints registered by
+    /// the modules' AddXxxConsumers / ConfigureXxxEndpoints (Payment, Wallet, Chapter; the host also has Comic and
+    /// Mission consumers, which are not part of a purchase).
+    /// </summary>
+    SingleHostBusOnRabbitMq,
 }
 
 public sealed class WorldOptions
@@ -120,6 +128,7 @@ public sealed class TestWorld : IAsyncDisposable
     public WorldOptions Options { get; }
     /// <summary>Call log and failure switch for the Payment to Chapter/Wallet calls (name kept from the gRPC days, T17).</summary>
     public ModuleCallLog Grpc { get; } = new();
+    public PaymentAPI.Settings.PurchaseRecoverySettings RecoverySettings { get; } = new();
     public MessageLog Messages { get; } = new();
     public StateLog States { get; } = new();
 
@@ -128,6 +137,17 @@ public sealed class TestWorld : IAsyncDisposable
 
     /// <summary>When set, DebitAsync on the Wallet repository throws (a "database failed" injection).</summary>
     public volatile bool FailWalletDebit;
+
+    /// <summary>T43: when set, SaveChangesAsync on the Chapter repository throws (the unlock row is never saved).</summary>
+    public volatile bool FailChapterSave;
+
+    /// <summary>
+    /// T43: runs once, synchronously, right before the next UnlockChapterAsync / SaveChangesAsync call on the Chapter
+    /// repository, then clears itself. Lets a test change the database at that exact point (delete the chapter, or
+    /// save a competing unlock row).
+    /// </summary>
+    public Action? BeforeChapterUnlock;
+    public Action? BeforeChapterSave;
 
     private TestWorld(WorldOptions options) => Options = options;
 
@@ -146,7 +166,7 @@ public sealed class TestWorld : IAsyncDisposable
     // ---------- building ----------
     private async Task BuildAsync(TestDatabases dbs)
     {
-        if (Options.Topology == Topology.SingleInMemoryBus)
+        if (Options.Topology is Topology.SingleInMemoryBus or Topology.SingleHostBusOnRabbitMq)
         {
             var host = Host(services =>
             {
@@ -155,15 +175,22 @@ public sealed class TestWorld : IAsyncDisposable
                 AddChapter(services, dbs);
                 services.AddMassTransit(x =>
                 {
-                    AddPaymentBus(x, outbox: false);
-                    AddWalletBus(x, outbox: false);
-                    AddChapterBus(x, outbox: false);
-                    x.UsingInMemory((ctx, cfg) =>
+                    // The modules' own registrations, as called by ComicMonolith.Api/Program.cs (T20).
+                    PaymentAPI.PaymentModule.AddPaymentConsumers(x);
+                    walletserver::WalletAPI.WalletModule.AddWalletConsumers(x);
+                    chapterserver::ChapterAPI.ChapterModule.AddChapterConsumers(x);
+
+                    void Endpoints(IBusFactoryConfigurator cfg, IBusRegistrationContext ctx)
                     {
-                        PaymentEndpoints(cfg, ctx);
-                        WalletEndpoints(cfg, ctx);
-                        ChapterEndpoints(cfg, ctx);
-                    });
+                        PaymentAPI.PaymentModule.ConfigurePaymentEndpoints(cfg, ctx);
+                        walletserver::WalletAPI.WalletModule.ConfigureWalletEndpoints(cfg, ctx);
+                        chapterserver::ChapterAPI.ChapterModule.ConfigureChapterEndpoints(cfg, ctx);
+                    }
+
+                    if (Options.Topology == Topology.SingleHostBusOnRabbitMq)
+                        x.UsingRabbitMq((ctx, cfg) => { RabbitHost(cfg); Endpoints(cfg, ctx); });
+                    else
+                        x.UsingInMemory((ctx, cfg) => Endpoints(cfg, ctx));
                 });
             });
             _payment = _wallet = _chapter = host;
@@ -238,6 +265,10 @@ public sealed class TestWorld : IAsyncDisposable
         s.AddSingleton<SharedKernel.Contracts.Modules.IPaymentWalletGateway>(_ => new RecordingWalletGateway(
             new walletserver::WalletAPI.ModuleServices.PaymentWalletGateway(_wallet.Services.GetRequiredService<IServiceScopeFactory>()), Grpc));
         s.AddMediatR(c => c.RegisterServicesFromAssemblies(typeof(PurchaseChapterCommandHandler).Assembly));
+        // T23: the purchase recovery job, as AddPaymentModule registers it, but NOT its hosted service: tests call
+        // RunOnceAsync themselves. RecoverySettings can be changed by a test before the first run.
+        s.AddSingleton<IOptions<PaymentAPI.Settings.PurchaseRecoverySettings>>(_ => Microsoft.Extensions.Options.Options.Create(RecoverySettings));
+        s.AddSingleton<PaymentAPI.Application.Services.PurchaseRecoveryJob>();
     }
 
     private void AddWallet(IServiceCollection s, TestDatabases dbs)
@@ -258,9 +289,22 @@ public sealed class TestWorld : IAsyncDisposable
         s.AddScoped<IChapterRepository>(sp =>
             FaultInjectingProxy.Wrap<IChapterRepository>(
                 ActivatorUtilities.CreateInstance<ChapterRepository>(sp),
-                (method, _) => FailChapterUnlock && method.Name == nameof(IChapterRepository.UnlockChapterAsync)
-                    ? new InvalidOperationException("injected: chapter database failed")
-                    : null));
+                (method, _) =>
+                {
+                    if (method.Name == nameof(IChapterRepository.UnlockChapterAsync))
+                    {
+                        Interlocked.Exchange(ref BeforeChapterUnlock, null)?.Invoke();
+                        return FailChapterUnlock ? new InvalidOperationException("injected: chapter database failed") : null;
+                    }
+
+                    if (method.Name == nameof(IChapterRepository.SaveChangesAsync))
+                    {
+                        Interlocked.Exchange(ref BeforeChapterSave, null)?.Invoke();
+                        return FailChapterSave ? new InvalidOperationException("injected: chapter save failed") : null;
+                    }
+
+                    return null;
+                }));
         // Not under test: the unlock handler needs these only for mission progress / comic checks.
         s.AddSingleton<IMapper>(new MapperConfiguration(_ => { }).CreateMapper());
         s.AddSingleton(NoOpProxy.Create<IComicValidator>());
@@ -300,12 +344,15 @@ public sealed class TestWorld : IAsyncDisposable
     {
         if (outbox)
             x.AddEntityFrameworkOutbox<WalletDbContext>(o => { o.UseSqlServer(); o.UseBusOutbox(); });
+        // Added by T20 (RedeliveryTests): WalletAPI's Program.cs registers this consumer too.
+        x.AddConsumer<walletserver::WalletAPI.Consumers.MissionRewardGrantedConsumer>();
         x.AddConsumer<DebitWalletConsumer>();
         x.AddConsumer<RefundWalletConsumer>();
     }
 
     private static void WalletEndpoints(IBusFactoryConfigurator cfg, IBusRegistrationContext ctx)
     {
+        cfg.ReceiveEndpoint("mission-reward-granted", e => e.ConfigureConsumer<walletserver::WalletAPI.Consumers.MissionRewardGrantedConsumer>(ctx));
         cfg.ReceiveEndpoint("debit-wallet", e => e.ConfigureConsumer<DebitWalletConsumer>(ctx));
         cfg.ReceiveEndpoint("refund-wallet", e => e.ConfigureConsumer<RefundWalletConsumer>(ctx));
     }

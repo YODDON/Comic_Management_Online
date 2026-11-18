@@ -66,6 +66,15 @@ public class WalletRepository : IWalletRepository
         }
     }
 
+    public async Task<WalletLedgerEntryDto?> GetEntryByReferenceIdAsync(Guid referenceId)
+    {
+        return await _context.CurrencyEntries
+            .AsNoTracking()
+            .Where(entry => entry.ReferenceId == referenceId)
+            .Select(entry => new WalletLedgerEntryDto(entry.Wallet.UserId, entry.Amount, entry.Type))
+            .SingleOrDefaultAsync();
+    }
+
     public async Task<WalletDebitResultDto> DebitAsync(
         int userId, decimal amount, Guid referenceId, string description)
     {

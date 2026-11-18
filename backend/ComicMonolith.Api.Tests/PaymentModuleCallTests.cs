@@ -9,6 +9,12 @@ using SharedKernel.Contracts.Modules;
 using WalletAPI.Application.Features.Wallet.Commands;
 using WalletAPI.DTOs;
 using WalletAPI.ModuleServices;
+using WalletAPI.Application.Features.Wallet.Queries;
+using SharedKernel.Enums;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using PaymentAPI.Settings;
 
 namespace ComicMonolith.Api.Tests;
 
@@ -199,6 +205,112 @@ public class PaymentModuleCallTests
 
         Assert.Equal(2, probe.ScopeIds.Distinct().Count());
         Assert.Equal(2, probe.ScopesDisposed);
+    }
+
+    // ---- T23: calls used by the purchase recovery job ----
+
+    [Fact]
+    public async Task Ledger_entry_keeps_the_signed_amount_user_and_type()
+    {
+        var reference = Guid.NewGuid();
+        var probe = new Probe(request =>
+        {
+            Assert.Equal(reference, ((GetLedgerEntryByReferenceQuery)request).ReferenceId);
+            return new WalletLedgerEntryDto(9, -120.55m, TransactionType.Purchase);
+        });
+
+        var entry = await new PaymentWalletGateway(probe.ScopeFactory()).GetLedgerEntryAsync(reference);
+
+        Assert.Equal(new WalletLedgerEntry(9, -120.55m, "Purchase"), entry);
+    }
+
+    [Fact]
+    public async Task Ledger_read_wraps_any_failure()
+    {
+        var cause = new InvalidOperationException("db down");
+        var gateway = new PaymentWalletGateway(new Probe(_ => throw cause).ScopeFactory());
+
+        var thrown = await Assert.ThrowsAsync<ModuleCallException>(() => gateway.GetLedgerEntryAsync(Guid.NewGuid()));
+
+        Assert.Same(cause, thrown.InnerException);
+    }
+
+    [Theory]
+    [InlineData(false, "Refunded.")]
+    [InlineData(true, "Already processed.")]
+    public async Task Refund_purchase_sends_the_amount_unchanged_and_the_transaction_id(bool alreadyProcessed, string message)
+    {
+        var transactionId = Guid.NewGuid();
+        var probe = new Probe(request =>
+        {
+            var command = (RefundPurchaseCommand)request;
+            Assert.Equal(9, command.UserId);
+            Assert.Equal(70.25m, command.Amount);
+            Assert.Equal(transactionId, command.TransactionId);
+            return new WalletCreditResultDto(alreadyProcessed, 1m);
+        });
+
+        var result = await new PaymentWalletGateway(probe.ScopeFactory()).RefundPurchaseAsync(9, 70.25m, transactionId);
+
+        Assert.Equal(new WalletCreditResult(true, message), result);
+    }
+
+    [Theory]
+    [InlineData(0, 10)]
+    [InlineData(9, 0)]
+    [InlineData(9, -5)]
+    public async Task Refund_purchase_rejects_a_user_id_or_amount_of_zero_or_less_without_calling_the_command(int userId, int amount)
+    {
+        var ran = false;
+        var probe = new Probe(_ => { ran = true; return new WalletCreditResultDto(false, 1m); });
+
+        await Assert.ThrowsAsync<ModuleCallException>(
+            () => new PaymentWalletGateway(probe.ScopeFactory()).RefundPurchaseAsync(userId, amount, Guid.NewGuid()));
+
+        Assert.False(ran);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Chapter_unlock_check_forwards_the_ids(bool unlocked)
+    {
+        var chapterId = Guid.NewGuid();
+        var probe = new Probe(request =>
+        {
+            var query = (IsChapterPurchasedQuery)request;
+            Assert.Equal(42, query.UserId);
+            Assert.Equal(chapterId, query.ChapterId);
+            return unlocked;
+        });
+
+        Assert.Equal(unlocked, await new PaymentChapterGateway(probe.ScopeFactory()).IsChapterUnlockedAsync(42, chapterId));
+    }
+
+    [Fact]
+    public async Task Chapter_unlock_check_wraps_any_failure()
+    {
+        var gateway = new PaymentChapterGateway(new Probe(_ => throw new InvalidOperationException("x")).ScopeFactory());
+
+        await Assert.ThrowsAsync<ModuleCallException>(() => gateway.IsChapterUnlockedAsync(42, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void Payment_module_registers_the_recovery_service_and_binds_its_settings()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["PurchaseRecovery:StuckAfterMinutes"] = "15" })
+            .Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        PaymentAPI.PaymentModule.AddPaymentModule(services, config);
+
+        Assert.Contains(services, d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(PaymentAPI.PurchaseRecoveryService));
+        var settings = services.BuildServiceProvider().GetRequiredService<IOptions<PurchaseRecoverySettings>>().Value;
+        Assert.True(settings.Enabled);
+        Assert.Equal(15, settings.StuckAfterMinutes);
+        Assert.Equal(5, settings.IntervalMinutes);
     }
 
     // ---- helpers ----
