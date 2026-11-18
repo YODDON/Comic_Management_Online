@@ -13,10 +13,13 @@ public static class WalletModule
 {
     public static IServiceCollection AddWalletModule(this IServiceCollection services, IConfiguration configuration)
     {
+        // No AddJsonOptions here (T46): in the host the MVC JSON options are shared by every module, so a
+        // converter added here would change the enum format of all modules. The old WalletAPI sent and read
+        // enums as text; that is kept with [JsonConverter(typeof(JsonStringEnumConverter))] on the enum
+        // properties of the Wallet DTOs (CurrencyEntryDto, CreateCurrencyEntryRequestDto, WithdrawDto,
+        // UpdateWithdrawStatusRequestDto). Every other module uses numbers, as its old service did.
         services.AddControllers()
-            .AddApplicationPart(typeof(CurrencyController).Assembly)
-            .AddJsonOptions(options =>
-                options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
+            .AddApplicationPart(typeof(CurrencyController).Assembly);
 
         services.AddScoped<ICurrencyRepository, CurrencyRepository>();
         services.AddScoped<IWithdrawRepository, WithdrawRepository>();

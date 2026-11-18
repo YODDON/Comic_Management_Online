@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using SharedKernel.Enums;
 
 namespace WalletAPI.DTOs;
@@ -19,6 +20,8 @@ public class WithdrawDto
     public string BankAccount { get; set; } = string.Empty;
     public string BankName { get; set; } = string.Empty;
     public string AccountName { get; set; } = string.Empty;
+    // Text on the wire, as the old WalletAPI sent and read it (T46).
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public WithdrawStatus Status { get; set; }
     public string? Note { get; set; }
     public DateTime CreatedAt { get; set; }
