@@ -49,10 +49,13 @@ chung trong host `ComicMonolith.Api`. gRPC, các file `.proto`, cấu hình
 1. Copy `.env.example` thành `.env` ở thư mục gốc repo này, rồi điền giá trị
    thật (Connection Strings, JWT Secret, Cloudinary, SMTP, Google Client ID,
    Bank/VietQR/SePay...).
-2. Với Docker Compose, các giá trị mặc định (khi không set trong `.env`) là:
-   - SQL Server: user `sa`, password lấy từ `SQL_SA_PASSWORD` (mặc định
-     `huy492004` nếu không set — **nên đặt password riêng khi không chỉ chạy
-     local**).
+2. Với Docker Compose:
+   - SQL Server: user `sa`, password lấy từ `SQL_SA_PASSWORD` trong `.env`.
+     **Không có giá trị mặc định**: thiếu biến này thì `docker compose` báo lỗi
+     và không khởi động. Password phải đủ chính sách của SQL Server (tối thiểu
+     8 ký tự, gồm 3 trong 4 loại: chữ hoa, chữ thường, số, ký hiệu), nếu không
+     container SQL Server sẽ dừng ngay khi khởi động.
+   - Dùng cùng password đó trong cả 8 connection string `*_DB_CONNECTION`.
 3. Mỗi service đọc connection string DB riêng của nó
    (`AUTH_DB_CONNECTION`, `COMIC_DB_CONNECTION`, `CHAPTER_DB_CONNECTION`,
    `BANNER_DB_CONNECTION`, `MISSION_DB_CONNECTION`, `SOCIAL_DB_CONNECTION`,
