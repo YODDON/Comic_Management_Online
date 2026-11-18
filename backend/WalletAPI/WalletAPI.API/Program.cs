@@ -9,12 +9,13 @@ var builder = WebApplication.CreateBuilder(args);
 DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
-// Standalone API keeps its old localhost fallback; the module itself has no hardcoded default.
+// Neither the standalone API nor the module has a hardcoded connection string (no default password).
 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WALLET_DB_CONNECTION"))
     && string.IsNullOrEmpty(builder.Configuration.GetConnectionString("WalletConnection"))
     && string.IsNullOrEmpty(builder.Configuration.GetConnectionString("DefaultConnection")))
 {
-    builder.Configuration["ConnectionStrings:WalletConnection"] = "Server=localhost,1433;Database=WalletDB;User Id=sa;Password=Your_password123;TrustServerCertificate=True;";
+    throw new InvalidOperationException(
+        "WALLET_DB_CONNECTION (or ConnectionStrings:WalletConnection / DefaultConnection) is not set. See backend/.env.example.");
 }
 
 builder.Services.AddWalletModule(builder.Configuration);

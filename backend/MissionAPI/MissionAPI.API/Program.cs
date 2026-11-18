@@ -10,12 +10,12 @@ DotNetEnv.Env.TraversePath().Load();
 builder.Configuration.AddEnvironmentVariables();
 
 // Controllers, DbContext, repositories, upload/Cloudinary, MediatR: see MissionModule.cs.
-// Note: the module has no localhost connection fallback; the standalone API keeps it below.
+// Note: neither the module nor the standalone API has a hardcoded connection string (no default password).
 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MISSION_DB_CONNECTION"))
     && string.IsNullOrEmpty(builder.Configuration.GetConnectionString("MissionConnection")))
 {
-    builder.Configuration["ConnectionStrings:MissionConnection"] =
-        "Server=localhost,1433;Database=MissionDB;User Id=sa;Password=Your_password123;TrustServerCertificate=True;";
+    throw new InvalidOperationException(
+        "MISSION_DB_CONNECTION (or ConnectionStrings:MissionConnection) is not set. See backend/.env.example.");
 }
 builder.Services.AddMissionModule(builder.Configuration);
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(MissionAPI.Application.Features.Missions.Queries.GetAllMissionsQuery).Assembly));

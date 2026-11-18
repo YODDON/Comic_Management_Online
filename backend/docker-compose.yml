@@ -6,7 +6,7 @@ services:
     container_name: prn232_sqlserver
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=${SQL_SA_PASSWORD:-changeme123}
+      - SA_PASSWORD=${SQL_SA_PASSWORD:?SQL_SA_PASSWORD must be set in backend/.env (8+ chars, upper, lower, digit, symbol)}
     ports:
       - "1433:1433"
     volumes:
